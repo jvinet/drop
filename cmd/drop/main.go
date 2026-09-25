@@ -104,6 +104,9 @@ func parentProcessEntry() (int, error) {
 			}
 			return nil
 		},
+		Edit: func(configName string) error {
+			return command.Edit(configName, homeDir)
+		},
 		Update: func(checkOnly bool) error {
 			if !checkOnly {
 				return fmt.Errorf("automatic updating not yet available, you can check for updates with 'drop update --check'")

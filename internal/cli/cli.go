@@ -53,6 +53,7 @@ type Handlers struct {
 	Run    func(flags *RunFlags) error
 	Ls     func() error
 	Rm     func(envId string) error
+	Edit   func(configName string) error
 	Update func(checkOnly bool) error
 }
 
@@ -173,13 +174,9 @@ The -m, -t, -T, -u, -U options are appended to options from the TOML config file
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					flags.Args = cmd.Args().Slice()
 
-					if flags.EnvId == "" {
-						return fmt.Errorf("could not determine environment ID from current directory")
+					if err := validateEnvId(flags.EnvId); err != nil {
+						return err
 					}
-					if !jailfs.IsEnvIdValid(flags.EnvId) {
-						return fmt.Errorf("invalid character in env ID")
-					}
-
 					return handlers.Run(&flags)
 				},
 			},
@@ -204,6 +201,31 @@ The -m, -t, -T, -u, -U options are appended to options from the TOML config file
 					}
 					envId := cmd.Args().First()
 					return handlers.Rm(envId)
+				},
+			},
+			{
+				Name:  "edit",
+				Usage: "Edit a Drop config file",
+				Description: `If env-id is not given, it is derived from the current working directory.
+'base' can be passed instead of env-id to edit base.toml.
+The editor is taken from $VISUAL, or from $EDITOR if $VISUAL is not set.`,
+				ArgsUsage: "[env-id or base]",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					var configName string
+					if cmd.NArg() > 1 {
+						return cli.Exit("usage: drop edit [env-id or base]", 1)
+					}
+					if cmd.NArg() == 0 {
+						configName = defaultEnvId
+					} else {
+						configName = cmd.Args().First()
+					}
+					if configName != "base" {
+						if err := validateEnvId(configName); err != nil {
+							return err
+						}
+					}
+					return handlers.Edit(configName)
 				},
 			},
 			{
@@ -277,6 +299,16 @@ func FlagsToConfig(cfg *config.Config, flags *RunFlags) error {
 	// and passed to this function was already validated during reading.
 	if err := config.Validate(cfg); err != nil {
 		return fmt.Errorf("command line flags: %v", err)
+	}
+	return nil
+}
+
+func validateEnvId(envId string) error {
+	if envId == "" {
+		return fmt.Errorf("could not determine environment ID from current directory")
+	}
+	if !jailfs.IsEnvIdValid(envId) {
+		return fmt.Errorf("invalid environment ID: %s", envId)
 	}
 	return nil
 }
