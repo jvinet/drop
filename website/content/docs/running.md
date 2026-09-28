@@ -74,9 +74,10 @@ home dir, which is removed together with the environment.
 
 ## Other commands
 
-* `drop help` - prints usage and available commands
-* `drop COMMAND help` - prints command-specific help, lists options supported by the command
-* `drop update --check` - checks if a new version of Drop is available
+* `drop help` - print usage and available commands
+* `drop COMMAND help` - print command-specific help, list options supported by the command
+* `drop edit [ENV_ID or base]` - open a TOML config in an editor
+* `drop update --check` - check if a new version of Drop is available
 
 ## Sharing the project directory
 

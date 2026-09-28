@@ -7,7 +7,8 @@ weight: 4
 ## Configuration files
 
 Config files are stored in `~/.config/drop/` by default and can be
-edited at any time.
+edited at any time. The `drop edit` command opens a config file
+in the editor set in `$VISUAL` or `$EDITOR`.
 
 Drop is a high-level sandboxing tool with minimal configuration. On
 systems following standard Linux/Unix conventions, an empty Drop

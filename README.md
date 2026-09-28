@@ -110,6 +110,7 @@ The commands to work with Drop are:
    not given, it is derived from the current working directory.
  * `drop ls` - list created environments
  * `drop rm <ENV_ID>` - remove an environment
+ * `drop edit [ENV_ID or base]` - open a TOML config in an editor
  * `drop update --check` - check if a new version of Drop is available
 
 See also the [Running](https://droprun.sh/docs/running/) doc.
