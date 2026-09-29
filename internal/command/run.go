@@ -94,7 +94,16 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		defer ptyReceiver.Close()
 	}
 
-	cmd := exec.Command("/proc/self/exe", "-child")
+	// Run the child using standard Drop executable path, not
+	// /proc/self/exe, because /proc/self/exe execution can be denied by
+	// an AppArmor profile (Ubuntu) and then fails with an error:
+	// fork/exec /proc/self/exe: permission denied
+	exePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("obtain drop executable path: %v", err)
+	}
+
+	cmd := exec.Command(exePath, "-child")
 	// 1) If stdin is a terminal, we pass it as-is to the child, so the
 	// child is also able to detect that stdin is a terminal. The terminal
 	// is then replaced with a new PTY created in the sandbox.
