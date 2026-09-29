@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"strings"
 
 	"github.com/wrr/drop/internal/cli"
 	"github.com/wrr/drop/internal/command"
@@ -36,7 +37,7 @@ func init() {
 		// with `go install` or local development binary. Obtain the
 		// version from the build info and fallback to 'dev'.
 		if info, ok := debug.ReadBuildInfo(); ok {
-			v := info.Main.Version
+			v := strings.TrimPrefix(info.Main.Version, "v")
 			if v != "" {
 				// Version info present (builder had access to the repo and
 				// git tags). This can be a clean version number, or with a

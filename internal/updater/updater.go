@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -34,9 +35,13 @@ func CheckForUpdate(currentVersion string) (string, error) {
 	return doCheckForUpdate(releaseURL, currentVersion)
 }
 
+// Released binaries have a version format MAJOR.MINOR.PATCH. Anything
+// else is a development build.
+var releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+
 // A separate function to allow to change url in tests.
 func doCheckForUpdate(url, currentVersion string) (string, error) {
-	if strings.Contains(currentVersion, "dev") || strings.Contains(currentVersion, "dirty") {
+	if !releaseVersion.MatchString(currentVersion) {
 		return "", fmt.Errorf("development build")
 	}
 
@@ -58,7 +63,8 @@ func doCheckForUpdate(url, currentVersion string) (string, error) {
 		return "", fmt.Errorf("invalid response: %v", err)
 	}
 
-	latestVersion := release.TagName
+	// Tags have 'v' prefix, version strings do not.
+	latestVersion := strings.TrimPrefix(release.TagName, "v")
 
 	if latestVersion != currentVersion {
 		return latestVersion, nil
