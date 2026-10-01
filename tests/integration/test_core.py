@@ -343,5 +343,15 @@ class TestCore(base.TestBase):
         self.assertSuccess(result)
         self.assertEqual('env3', result.stdout.strip())
 
+    def test_version(self):
+        result = self.drop('--version')
+        self.assertSuccess(result)
+        m = re.fullmatch(r'drop version (\S+)\n', result.stdout)
+        self.assertTrue(m,
+                        f'Unexpected --version output: {result.stdout!r}')
+        version = m.group(1)
+        self.assertFalse(version.startswith('v'),
+                         f'Unexpected v prefix in version: {version}')
+
 class TestCoreGvisor(TestCore):
     runtime = 'gvisor'
