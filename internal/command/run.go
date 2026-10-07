@@ -43,8 +43,8 @@ import (
 )
 
 // RunParent handles parent process logic for the 'drop run' command.
-// It executes a child process in a new namespace and the child
-// invokes RunChild.
+// It executes an init process in a new namespace and the init
+// process invokes RunInit.
 func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 	var configPath string
 	if !osutil.CanStat(jailfs.EnvPath(dropHome, flags.EnvId)) {
@@ -73,7 +73,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		return fmt.Errorf("port forwarding is only supported with isolated network mode (--net isolated)")
 	}
 
-	// Socket pair for communicating with the child process.
+	// Socket pair for communicating with the init process.
 	parentEnd, childEnd, err := ipc.NewParentChildSocket()
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		defer ptyReceiver.Close()
 	}
 
-	// Run the child using standard Drop executable path, not
+	// Run the init process using standard Drop executable path, not
 	// /proc/self/exe, because /proc/self/exe execution can be denied by
 	// an AppArmor profile (Ubuntu) and then fails with an error:
 	// fork/exec /proc/self/exe: permission denied
@@ -103,9 +103,9 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		return fmt.Errorf("obtain drop executable path: %v", err)
 	}
 
-	cmd := exec.Command(exePath, "-child")
-	// 1) If stdin is a terminal, we pass it as-is to the child, so the
-	// child is also able to detect that stdin is a terminal. The terminal
+	cmd := exec.Command(exePath, "-init")
+	// 1) If stdin is a terminal, we pass it as-is to the init process,
+	// so it is also able to detect that stdin is a terminal. The terminal
 	// is then replaced with a new PTY created in the sandbox.
 	//
 	// 2) If stdin is not a terminal, it is wrapped with io.Reader
@@ -315,10 +315,10 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 	}
 }
 
-// RunChild handles child process logic for the 'drop run' command.
+// RunInit handles init process logic for the 'drop run' command.
 // It sets up the namespace, drops privileges and executes a command
 // provided by the user.
-func RunChild() error {
+func RunInit() error {
 	// The child end of the socket pair is inherited as file descriptor 3
 	childEnd := ipc.NewChildEnd(3)
 	defer childEnd.Close()
@@ -355,7 +355,7 @@ func RunChild() error {
 	}
 
 	if _, err := unix.Setsid(); err != nil {
-		return fmt.Errorf("setsid for child process: %v", err)
+		return fmt.Errorf("setsid for init process: %v", err)
 	}
 
 	if err := jailfs.WriteEtcFiles(paths); err != nil {

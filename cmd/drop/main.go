@@ -53,8 +53,8 @@ func init() {
 func main() {
 	var exitCode int
 	var err error
-	if len(os.Args) > 1 && os.Args[1] == "-child" {
-		exitCode, err = childProcessEntry()
+	if len(os.Args) > 1 && os.Args[1] == "-init" {
+		exitCode, err = initProcessEntry()
 	} else {
 		exitCode, err = parentProcessEntry()
 	}
@@ -137,8 +137,8 @@ func parentProcessEntry() (int, error) {
 	return 0, nil
 }
 
-func childProcessEntry() (int, error) {
-	err := command.RunChild()
+func initProcessEntry() (int, error) {
+	err := command.RunInit()
 	if err != nil {
 		return 1, err
 	}
