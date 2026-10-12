@@ -148,10 +148,9 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		syscall.CLONE_NEWIPC |
 		syscall.CLONE_NEWPID |
 		syscall.CLONE_NEWUSER |
-		syscall.CLONE_NEWCGROUP)
-	if cfg.Net.Mode != "unjailed" {
-		cloneFlags |= syscall.CLONE_NEWNET
-	}
+		syscall.CLONE_NEWCGROUP |
+		syscall.CLONE_NEWNET)
+
 	var containerUID, containerGID int
 	if flags.BeRoot {
 		containerUID = 0

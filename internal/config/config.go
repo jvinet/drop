@@ -564,7 +564,7 @@ func validateEnvironExposedVars(patterns []string) error {
 
 func validateNetworkMode(mode string) error {
 	switch mode {
-	case "off", "isolated", "unjailed":
+	case "off", "isolated":
 		return nil
 	default:
 		return fmt.Errorf("invalid network mode '%s': must be 'off' or 'isolated'", mode)

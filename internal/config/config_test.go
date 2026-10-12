@@ -722,7 +722,7 @@ mount = []
 }
 
 func TestValidateNetworkMode(t *testing.T) {
-	validModes := []string{"off", "isolated", "unjailed"}
+	validModes := []string{"off", "isolated"}
 	for _, mode := range validModes {
 		if err := validateNetworkMode(mode); err != nil {
 			t.Errorf("expected no error for mode '%s', got: %v", mode, err)

@@ -324,11 +324,8 @@ func (rt *root) mountProc() error {
 	return rt.mount("proc", "/proc", "proc", flags, "")
 }
 
-func (rt *root) mountSys(cfg *config.Config) error {
-	if cfg.Net.Mode == "unjailed" {
-		// Mounting /sys is allowed only within own network namespace
-		return nil
-	}
+func (rt *root) mountSys() error {
+	// Mounting /sys is allowed only within own network namespace
 	flags := uintptr(unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV | unix.MS_RDONLY)
 	if err := rt.mount("sysfs", "/sys", "sysfs", flags, ""); err != nil {
 		return err
@@ -466,7 +463,7 @@ func ArrangeFilesystem(paths *Paths, cfg *config.Config) error {
 		}
 		procRt = hostRt
 	} else {
-		if err := rt.mountSys(cfg); err != nil {
+		if err := rt.mountSys(); err != nil {
 			return err
 		}
 	}
