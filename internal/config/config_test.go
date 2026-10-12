@@ -1062,6 +1062,53 @@ func TestValidatePaths(t *testing.T) {
 	}
 }
 
+func TestIncludedFileAbsPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+		error    string
+	}{
+		{
+			name:     "home relative path",
+			path:     "~/shared/config.toml",
+			expected: "/home/alice/shared/config.toml",
+		},
+		{
+			name:     "absolute path",
+			path:     "/etc/drop/config.toml",
+			expected: "/etc/drop/config.toml",
+		},
+		{
+			name:     "config dir relative path",
+			path:     "sub-dir/config.toml",
+			expected: "/config/sub-dir/config.toml",
+		},
+		{
+			name:  "invalid home relative path",
+			path:  "~/",
+			error: "path '~/' invalid: path cannot point to the whole home directory",
+		},
+		{
+			name:  "invalid config dir relative path",
+			path:  "../config.toml",
+			error: "path '../config.toml' invalid: path is not normalized",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := includedFileAbsPath(tt.path, "/config", "/home/alice")
+			if terr := checkError(tt.error, err); terr != nil {
+				t.Fatal(terr)
+			}
+			if result != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestValidateExposedEnvVars(t *testing.T) {
 	tests := []struct {
 		name     string

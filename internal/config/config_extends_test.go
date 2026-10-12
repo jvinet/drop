@@ -32,7 +32,7 @@ func fakeReadFile(files map[string]string) func(string) ([]byte, error) {
 	}
 }
 
-func read(path string, files map[string]string) (*Config, error) {
+func readConfig(path string, files map[string]string) (*Config, error) {
 	r := &reader{
 		files:    make(map[string]bool),
 		homeDir:  "/home/alice",
@@ -251,13 +251,13 @@ extends = "missing.toml"
 extends = "../etc/passwd"
 `,
 			},
-			error: "extends path ../etc/passwd invalid: path is not normalized",
+			error: "extends path '../etc/passwd' invalid: path is not normalized",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := read("/config/entry.toml", tt.files)
+			result, err := readConfig("/config/entry.toml", tt.files)
 			if terr := checkError(tt.error, err); terr != nil {
 				t.Fatal(terr)
 			}

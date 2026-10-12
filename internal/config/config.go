@@ -64,10 +64,16 @@ type EnvVar struct {
 
 type Net struct {
 	Mode              string          `toml:"mode"`
+	Firewall          *Firewall       `toml:"firewall"`
 	TCPPublishedPorts []PublishedPort `toml:"tcp_published_ports"`
 	TCPHostPorts      []HostPort      `toml:"tcp_host_ports"`
 	UDPPublishedPorts []PublishedPort `toml:"udp_published_ports"`
 	UDPHostPorts      []HostPort      `toml:"udp_host_ports"`
+}
+
+func (n *Net) IsFirewallEnabled() bool {
+	fw := n.Firewall
+	return n.Mode == "isolated" && fw != nil && (fw.Enabled == nil || *fw.Enabled)
 }
 
 type PublishedPort struct {
@@ -207,6 +213,22 @@ type reader struct {
 	readFile func(name string) ([]byte, error)
 }
 
+// includedFileAbsPath validates and resolves relative and home
+// relative paths of files included from a config file (either files
+// included with `extends` or firewall rule files).
+func includedFileAbsPath(path, configDir, homeDir string) (string, error) {
+	if osutil.IsRootOrHomeSubPath(path) {
+		if err := osutil.ValidateRootOrHomeSubPath(path); err != nil {
+			return "", fmt.Errorf("path '%s' invalid: %v", path, err)
+		}
+		return osutil.TildeToHomeDir(path, homeDir), nil
+	}
+	if err := osutil.ValidateRelPath(path); err != nil {
+		return "", fmt.Errorf("path '%s' invalid: %v", path, err)
+	}
+	return filepath.Join(configDir, path), nil
+}
+
 func Read(path string, homeDir string) (*Config, error) {
 	r := &reader{
 		files:    make(map[string]bool),
@@ -234,16 +256,9 @@ func (r *reader) read(path string) (*Config, error) {
 }
 
 func (r *reader) readBase(path string, configDir string) (*Config, error) {
-	if osutil.IsRootOrHomeSubPath(path) {
-		if err := osutil.ValidateRootOrHomeSubPath(path); err != nil {
-			return nil, fmt.Errorf("extends path %s invalid: %v", path, err)
-		}
-		path = osutil.TildeToHomeDir(path, r.homeDir)
-	} else {
-		if err := osutil.ValidateRelPath(path); err != nil {
-			return nil, fmt.Errorf("extends path %s invalid: %v", path, err)
-		}
-		path = filepath.Join(configDir, path)
+	path, err := includedFileAbsPath(path, configDir, r.homeDir)
+	if err != nil {
+		return nil, fmt.Errorf("extends %v", err)
 	}
 	return r.read(path)
 }
@@ -257,6 +272,14 @@ func (r *reader) parse(configStr string, configDir string) (*Config, error) {
 	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
 		return nil, fmt.Errorf("unrecognized key: %s", undecoded[0].String())
 	}
+	if fw := cfg.Net.Firewall; fw != nil {
+		if !firewallFeatureFlagOn() {
+			return nil, fmt.Errorf("unrecognized key: net.firewall")
+		}
+		if err := firewallPathsToAbs(fw, configDir, r.homeDir); err != nil {
+			return nil, err
+		}
+	}
 	if cfg.Extends != "" {
 		base, err := r.readBase(cfg.Extends, configDir)
 		if err != nil {
@@ -265,6 +288,16 @@ func (r *reader) parse(configStr string, configDir string) (*Config, error) {
 		cfg = merge(base, cfg)
 	}
 
+	setDefaults(cfg)
+
+	if err := Validate(cfg); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func setDefaults(cfg *Config) {
 	if cfg.Runtime == "" {
 		cfg.Runtime = RuntimeNative
 	}
@@ -273,11 +306,9 @@ func (r *reader) parse(configStr string, configDir string) (*Config, error) {
 		cfg.Net.Mode = "isolated"
 	}
 
-	if err := Validate(cfg); err != nil {
-		return nil, err
+	if cfg.Net.Firewall != nil {
+		setFirewallDefaults(cfg.Net.Firewall)
 	}
-
-	return cfg, nil
 }
 
 func merge(base *Config, sub *Config) *Config {
@@ -300,6 +331,7 @@ func merge(base *Config, sub *Config) *Config {
 		},
 		Net: Net{
 			Mode:              netMode,
+			Firewall:          mergeFirewall(base.Net.Firewall, sub.Net.Firewall),
 			TCPPublishedPorts: slices.Concat(base.Net.TCPPublishedPorts, sub.Net.TCPPublishedPorts),
 			TCPHostPorts:      slices.Concat(base.Net.TCPHostPorts, sub.Net.TCPHostPorts),
 			UDPPublishedPorts: slices.Concat(base.Net.UDPPublishedPorts, sub.Net.UDPPublishedPorts),
@@ -340,6 +372,10 @@ func Validate(cfg *Config) error {
 
 	if err := validateHostPorts(cfg.Net.UDPHostPorts); err != nil {
 		return fmt.Errorf("invalid udp_host_ports: %v", err)
+	}
+
+	if err := validateFirewall(cfg.Net); err != nil {
+		return err
 	}
 	return nil
 }
