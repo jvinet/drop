@@ -70,7 +70,7 @@ net.mode = "isolated"
 					{Source: "~/base-mount", Target: "~/base-mount"},
 					{Source: "~/entry-mount", Target: "~/entry-mount"},
 				},
-				Net: Net{Mode: "off"},
+				Net: Net{Mode: NetModeOff},
 			},
 		},
 		{
@@ -93,7 +93,7 @@ net.mode = "off"
 					{Source: "~/base-mount", Target: "~/base-mount"},
 					{Source: "~/entry-mount", Target: "~/entry-mount"},
 				},
-				Net: Net{Mode: "off"},
+				Net: Net{Mode: NetModeOff},
 			},
 		},
 		{
@@ -114,7 +114,7 @@ mounts = ["~/base-mount"]
 					{Source: "~/base-mount", Target: "~/base-mount"},
 					{Source: "~/entry-mount", Target: "~/entry-mount"},
 				},
-				Net: Net{Mode: "isolated"},
+				Net: Net{Mode: NetModeIsolated},
 			},
 		},
 		{
@@ -146,7 +146,7 @@ blocked_paths = ["/base-base-blocked"]
 					{Source: "~/entry-mount", Target: "~/entry-mount"},
 				},
 				BlockedPaths: []string{"/base-base-blocked", "/base-blocked", "/child-blocked"},
-				Net:          Net{Mode: "isolated"},
+				Net:          Net{Mode: NetModeIsolated},
 			},
 		},
 		{
@@ -194,7 +194,7 @@ udp_host_ports = ["8003"]
 					},
 				},
 				Net: Net{
-					Mode: "isolated",
+					Mode: NetModeIsolated,
 					TCPPublishedPorts: []PublishedPort{
 						{HostIP: "127.0.0.1", HostPort: 8000, GuestPort: 8000},
 						{HostIP: "127.0.0.1", HostPort: 9000, GuestPort: 9000},

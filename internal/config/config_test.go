@@ -372,7 +372,7 @@ udp_host_ports = ["12000:1700", "9000"]
 			expected: Config{
 				Runtime: RuntimeNative,
 				Net: Net{
-					Mode:              "isolated",
+					Mode:              NetModeIsolated,
 					TCPPublishedPorts: []PublishedPort{{Auto: true}},
 					TCPHostPorts:      []HostPort{{HostPort: 8080, GuestPort: 8080}, {HostPort: 3000, GuestPort: 3001}},
 					UDPPublishedPorts: []PublishedPort{{HostIP: "127.0.0.1", HostPort: 5000, GuestPort: 5000}},
@@ -394,7 +394,7 @@ udp_host_ports = []
 			expected: Config{
 				Runtime: RuntimeNative,
 				Net: Net{
-					Mode:              "off",
+					Mode:              NetModeOff,
 					TCPPublishedPorts: []PublishedPort{},
 					TCPHostPorts:      []HostPort{},
 					UDPPublishedPorts: []PublishedPort{},
@@ -409,7 +409,7 @@ udp_host_ports = []
 			expected: Config{
 				Runtime: RuntimeNative,
 				Net: Net{
-					Mode:              "isolated", // default
+					Mode:              NetModeIsolated, // default
 					TCPPublishedPorts: []PublishedPort{},
 					TCPHostPorts:      nil,
 					UDPPublishedPorts: []PublishedPort{},
@@ -482,7 +482,7 @@ udp_host_ports = ["12000:1700", "9000"]
 					},
 				},
 				Net: Net{
-					Mode: "isolated",
+					Mode: NetModeIsolated,
 					TCPPublishedPorts: []PublishedPort{
 						{HostIP: "127.0.0.1", HostPort: 8080, GuestPort: 8080},
 						{HostIP: "127.0.0.1", HostPort: 3000, GuestPort: 3001},
@@ -502,7 +502,7 @@ udp_host_ports = ["12000:1700", "9000"]
 				Mounts:       nil,
 				BlockedPaths: nil,
 				Net: Net{
-					Mode:              "isolated", // default
+					Mode:              NetModeIsolated, // default
 					TCPPublishedPorts: []PublishedPort{},
 					TCPHostPorts:      nil,
 					UDPPublishedPorts: []PublishedPort{},
@@ -541,7 +541,7 @@ environ.set_vars = ["FOO=bar", "BAZ=qux=123"]
 					},
 				},
 				Net: Net{
-					Mode: "isolated",
+					Mode: NetModeIsolated,
 				},
 			},
 			error: "",
@@ -722,7 +722,7 @@ mount = []
 }
 
 func TestValidateNetworkMode(t *testing.T) {
-	validModes := []string{"off", "isolated"}
+	validModes := []string{NetModeOff, NetModeIsolated}
 	for _, mode := range validModes {
 		if err := validateNetworkMode(mode); err != nil {
 			t.Errorf("expected no error for mode '%s', got: %v", mode, err)

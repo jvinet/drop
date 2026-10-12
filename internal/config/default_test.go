@@ -71,7 +71,7 @@ func TestWriteBase(t *testing.T) {
 	}
 
 	net := cfg.Net
-	if net.Mode != "isolated" {
+	if net.Mode != NetModeIsolated {
 		t.Errorf("Expected default net mode 'isolated', got %s", net.Mode)
 	}
 
@@ -123,7 +123,7 @@ func TestWriteDefaultForEnv(t *testing.T) {
 	}
 
 	// Net mode should default to "isolated" (from base config).
-	if cfg.Net.Mode != "isolated" {
+	if cfg.Net.Mode != NetModeIsolated {
 		t.Errorf("Expected net mode 'isolated', got %s", cfg.Net.Mode)
 	}
 

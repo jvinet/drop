@@ -69,7 +69,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		len(flags.TcpHostPorts) > 0 ||
 		len(flags.UdpPublishedPorts) > 0 ||
 		len(flags.UdpHostPorts) > 0) &&
-		cfg.Net.Mode != "isolated" {
+		cfg.Net.Mode != config.NetModeIsolated {
 		return fmt.Errorf("port forwarding is only supported with isolated network mode (--net isolated)")
 	}
 
@@ -240,7 +240,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 
 	// Start pasta to provide network connectivity to the jailed process
 	// in isolated network mode
-	if cfg.Net.Mode == "isolated" {
+	if cfg.Net.Mode == config.NetModeIsolated {
 		// Store Pasta pid and log files in tmp run dir, not in the main
 		// paths.Run, because the default AppArmor policy shipped with pasta
 		// and used on AppArmor-enabled Debian and openSUSE, as well as

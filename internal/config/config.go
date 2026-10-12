@@ -62,6 +62,11 @@ type EnvVar struct {
 	Value string
 }
 
+const (
+	NetModeOff      = "off"
+	NetModeIsolated = "isolated"
+)
+
 type Net struct {
 	Mode              string          `toml:"mode"`
 	Firewall          *Firewall       `toml:"firewall"`
@@ -73,7 +78,7 @@ type Net struct {
 
 func (n *Net) IsFirewallEnabled() bool {
 	fw := n.Firewall
-	return n.Mode == "isolated" && fw != nil && (fw.Enabled == nil || *fw.Enabled)
+	return n.Mode == NetModeIsolated && fw != nil && (fw.Enabled == nil || *fw.Enabled)
 }
 
 type PublishedPort struct {
@@ -303,7 +308,7 @@ func setDefaults(cfg *Config) {
 	}
 
 	if cfg.Net.Mode == "" {
-		cfg.Net.Mode = "isolated"
+		cfg.Net.Mode = NetModeIsolated
 	}
 
 	if cfg.Net.Firewall != nil {
@@ -564,10 +569,10 @@ func validateEnvironExposedVars(patterns []string) error {
 
 func validateNetworkMode(mode string) error {
 	switch mode {
-	case "off", "isolated":
+	case NetModeOff, NetModeIsolated:
 		return nil
 	default:
-		return fmt.Errorf("invalid network mode '%s': must be 'off' or 'isolated'", mode)
+		return fmt.Errorf("invalid network mode '%s': must be '%s' or '%s'", mode, NetModeOff, NetModeIsolated)
 	}
 }
 

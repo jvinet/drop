@@ -51,7 +51,7 @@ func TestParentChildCommunication(t *testing.T) {
 				SetVars:     []config.EnvVar{{Name: "FOO", Value: "bar"}},
 			},
 			Net: config.Net{
-				Mode: "isolated",
+				Mode: config.NetModeIsolated,
 				TCPPublishedPorts: []config.PublishedPort{
 					{HostPort: 8080, GuestPort: 3000},
 					{HostPort: 8082, GuestPort: 3003},
