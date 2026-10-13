@@ -389,7 +389,7 @@ func Validate(cfg *Config) error {
 // source:target:options, where target and options are optional. If
 // target is not given or empty, it equals source.  Options are comma
 // separated and can be "rw" and "overlay". Valid strings: "~/go",
-// "~/go:~/host-go" "~/go:~/host-go:ro", "~/go::ro,overlay
+// "~/go:~/host-go" "~/go:~/host-go:rw", "~/go::rw,overlay
 func ParseMountCompact(str string) (*Mount, error) {
 	var m Mount
 	parts := strings.Split(str, ":")
