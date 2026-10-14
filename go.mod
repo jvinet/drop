@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
+	github.com/miekg/dns v1.1.73
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/urfave/cli/v3 v3.14.0
 	golang.org/x/sys v0.48.0
@@ -11,4 +12,7 @@ require (
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
 
-require kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
+require (
+	golang.org/x/net v0.57.0 // indirect
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
+)
