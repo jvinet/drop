@@ -34,8 +34,7 @@ var Version = "" // overridden by release binaries linker
 func init() {
 	if Version == "" {
 		// Not a realease binary, but a binary installed from the git repo
-		// with `go install` or local development binary. Obtain the
-		// version from the build info and fallback to 'dev'.
+		// with `go install` or local development binary.
 		if info, ok := debug.ReadBuildInfo(); ok {
 			v := strings.TrimPrefix(info.Main.Version, "v")
 			if v != "" {
