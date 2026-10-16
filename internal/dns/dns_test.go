@@ -120,25 +120,25 @@ func setupUpstream(t *testing.T, fxt *fixture) string {
 			reply.Compress = true
 			for i := range manyACount {
 				reply.Answer = append(reply.Answer, &dns.A{
-					Hdr: dns.RR_Header{Name: question.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					Hdr: header(question.Name, dns.TypeA),
 					A:   net.IPv4(10, 0, 0, byte(i+1)),
 				})
 			}
 		case question.Name == multiAName:
 			for _, addr := range multiAddrs {
 				reply.Answer = append(reply.Answer, &dns.A{
-					Hdr: dns.RR_Header{Name: question.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					Hdr: header(question.Name, dns.TypeA),
 					A:   addr,
 				})
 			}
 		case question.Name == cnameName:
 			reply.Answer = []dns.RR{
 				&dns.CNAME{
-					Hdr:    dns.RR_Header{Name: cnameName, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 60},
+					Hdr:    header(cnameName, dns.TypeCNAME),
 					Target: cnameTarget,
 				},
 				&dns.A{
-					Hdr: dns.RR_Header{Name: cnameTarget, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					Hdr: header(cnameTarget, dns.TypeA),
 					A:   fxt.answerA,
 				},
 			}
@@ -146,7 +146,7 @@ func setupUpstream(t *testing.T, fxt *fixture) string {
 			// NOERROR with no records
 		case question.Name == singleAName:
 			reply.Answer = []dns.RR{&dns.A{
-				Hdr: dns.RR_Header{Name: question.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+				Hdr: header(question.Name, dns.TypeA),
 				A:   fxt.answerA,
 			}}
 		default:
@@ -196,6 +196,10 @@ func setup(t *testing.T) *fixture {
 	upstreamAddr := setupUpstream(t, &fxt)
 	fxt.dnsAddress = setupServer(t, upstreamAddr)
 	return &fxt
+}
+
+func header(name string, rrtype uint16) dns.RR_Header {
+	return dns.RR_Header{Name: name, Rrtype: rrtype, Class: dns.ClassINET, Ttl: 60}
 }
 
 func TestStartErrorReporting(t *testing.T) {
