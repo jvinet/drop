@@ -198,6 +198,27 @@ func setup(t *testing.T) *fixture {
 	return &fxt
 }
 
+
+func TestStartErrorReporting(t *testing.T) {
+	conn, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+        // passing already closed socket triggers an error
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	stop, err := startServer(conn, "")
+	if err == nil {
+		stop()
+		t.Fatal("start server: got no error for a closed conn")
+	}
+	if stop != nil {
+		t.Error("start server: got a shutdown function along with an error")
+	}
+}
+
 func TestARecordAnswered(t *testing.T) {
 	fxt := setup(t)
 

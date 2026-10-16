@@ -37,6 +37,9 @@ type server struct {
 // StartServer answers queries arriving on conn until the returned
 // shutdown function is called. Names are resolved with the name
 // servers configured on the host.
+//
+// Takes ownership of conn, closing it when the server fails to start
+// or the shutdown function is called.
 func StartServer(conn net.PacketConn) (func(), error) {
 	return startServer(conn, "")
 }
@@ -65,6 +68,7 @@ func startServer(conn net.PacketConn, upstream string) (func(), error) {
 	select {
 	case <-started:
 	case err := <-errs:
+		conn.Close()
 		return nil, err
 	}
 
