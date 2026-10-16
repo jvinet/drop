@@ -34,7 +34,12 @@ const (
 	servfailName = "servfail.test."
 	cnameName    = "cname.test."
 	cnameTarget  = "target.test."
+	manyAName    = "manya.test."
 )
+
+// Enough A records that the reply does not fit a 512 byte buffer even
+// when compressed.
+const manyACount = 40
 
 var multiAddrs = []net.IP{
 	net.IPv4(134, 12, 8, 7),
@@ -111,6 +116,14 @@ func setupUpstream(t *testing.T, fxt *fixture) string {
 			reply.Rcode = dns.RcodeNameError
 		case question.Name == servfailName:
 			reply.Rcode = dns.RcodeServerFailure
+		case question.Name == manyAName:
+			reply.Compress = true
+			for i := range manyACount {
+				reply.Answer = append(reply.Answer, &dns.A{
+					Hdr: dns.RR_Header{Name: question.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					A:   net.IPv4(10, 0, 0, byte(i+1)),
+				})
+			}
 		case question.Name == multiAName:
 			for _, addr := range multiAddrs {
 				reply.Answer = append(reply.Answer, &dns.A{
@@ -389,6 +402,69 @@ func TestCnameFlattened(t *testing.T) {
 	}
 	if !a.A.Equal(fxt.answerA) {
 		t.Errorf("answer: got %s, want %s", a.A, fxt.answerA)
+	}
+	fxt.checkUpstreamQueries(t, 1)
+}
+
+// A client that sends no OPT record reads at most 512 bytes, so a
+// larger reply has to lose records and report it with the truncated bit.
+func TestLargeReplyTruncated(t *testing.T) {
+	fxt := setup(t)
+
+	query := new(dns.Msg)
+	query.SetQuestion(manyAName, dns.TypeA)
+	reply, _, err := new(dns.Client).Exchange(query, fxt.dnsAddress)
+	if err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+
+	if reply.Rcode != dns.RcodeSuccess {
+		t.Fatalf("rcode: got %s, want NOERROR", dns.RcodeToString[reply.Rcode])
+	}
+	if !reply.Truncated {
+		t.Error("tc bit not set")
+	}
+	if len(reply.Answer) == 0 || len(reply.Answer) >= manyACount {
+		t.Errorf("answer: got %d records, want some but fewer than %d",
+			len(reply.Answer), manyACount)
+	}
+	if opt := reply.IsEdns0(); opt != nil {
+		t.Errorf("opt record in reply to a query without one: %s", opt)
+	}
+	fxt.checkUpstreamQueries(t, 1)
+}
+
+// A client that advertises a larger buffer gets the whole reply and an
+// OPT record of its own.
+func TestLargeReplyFitsAdvertisedSize(t *testing.T) {
+	fxt := setup(t)
+
+	query := new(dns.Msg)
+	query.SetQuestion(manyAName, dns.TypeA)
+	query.SetEdns0(8000, false)
+	reply, _, err := (&dns.Client{UDPSize: 8000}).Exchange(query, fxt.dnsAddress)
+	if err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+
+	if reply.Rcode != dns.RcodeSuccess {
+		t.Fatalf("rcode: got %s, want NOERROR", dns.RcodeToString[reply.Rcode])
+	}
+	if reply.Truncated {
+		t.Error("tc bit set")
+	}
+	if len(reply.Answer) != manyACount {
+		t.Errorf("answer: got %d records, want %d", len(reply.Answer), manyACount)
+	}
+	opt := reply.IsEdns0()
+	if opt == nil {
+		t.Fatal("no opt record in reply to an edns0 query")
+	}
+	if got := opt.UDPSize(); got != 512 {
+		t.Errorf("advertised udp size: got %d, want %d", got, 512)
+	}
+	if opt.Do() {
+		t.Error("do bit set")
 	}
 	fxt.checkUpstreamQueries(t, 1)
 }

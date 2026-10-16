@@ -103,9 +103,23 @@ func (s *server) handle(w dns.ResponseWriter, req *dns.Msg) {
 	default:
 		// Also an empty NOERROR: clients fall back to A or give up,
 		// REFUSED can be treated as a server problem and
-		// can lead to retriers. 
+		// can lead to retriers.
 		info("no data for %s query for %s", dns.TypeToString[question.Qtype], question.Name)
 	}
+
+	minClientSize := dns.MinMsgSize
+	if opt := req.IsEdns0(); opt != nil {
+		// A reply must carry an OPT record if the query did.
+
+		// We just advertise the default UDP max size of 512, because we
+		// expect just a single query, but any larger size will work
+		// without fragmentation, as this is a local communication only.
+		reply.SetEdns0(dns.MinMsgSize, false)
+		minClientSize = int(opt.UDPSize())
+	}
+	// Drops records that do not fit the client buffer and sets the
+	// truncated bit. Enables compression when needed.
+	reply.Truncate(minClientSize)
 
 	if err := w.WriteMsg(reply); err != nil {
 		info("send answer: %v", err)
