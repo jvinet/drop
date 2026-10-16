@@ -42,7 +42,7 @@ type ChildEnd struct {
 // the parent constructs and sends to the child.
 //
 // Note for future extensions: unexported fields or interface types if
-// included within ChildArgs chierarchy will not be encoded and sent
+// included within ChildArgs hierarchy will not be encoded and sent
 // (encoding/gob limitation).
 type ChildArgs struct {
 	EnvId    string
