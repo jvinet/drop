@@ -99,6 +99,11 @@ func (s *server) handle(w dns.ResponseWriter, req *dns.Msg) {
 		// The host resolver always recurses.
 		info("refused %s, recursion not desired", question.Name)
 		reply.Rcode = dns.RcodeRefused
+	case question.Qclass != dns.ClassINET:
+		// IN is the only class in practical use.
+		info("refused %s class query for %s",
+			dns.Class(question.Qclass).String(), question.Name)
+		reply.Rcode = dns.RcodeRefused
 	case question.Qtype == dns.TypeA:
 		s.resolve(reply, question)
 	case question.Qtype == dns.TypeAAAA:

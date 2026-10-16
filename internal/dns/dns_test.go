@@ -198,13 +198,12 @@ func setup(t *testing.T) *fixture {
 	return &fxt
 }
 
-
 func TestStartErrorReporting(t *testing.T) {
 	conn, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-        // passing already closed socket triggers an error
+	// passing already closed socket triggers an error
 	if err := conn.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -336,6 +335,26 @@ func TestRecursionNotDesiredRefused(t *testing.T) {
 	query := new(dns.Msg)
 	query.SetQuestion(singleAName, dns.TypeA)
 	query.RecursionDesired = false
+	reply, _, err := new(dns.Client).Exchange(query, fxt.dnsAddress)
+	if err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+
+	if reply.Rcode != dns.RcodeRefused {
+		t.Errorf("rcode: got %s, want REFUSED", dns.RcodeToString[reply.Rcode])
+	}
+	if len(reply.Answer) != 0 {
+		t.Errorf("answer: got %v, want no records", reply.Answer)
+	}
+	fxt.checkUpstreamQueries(t, 0)
+}
+
+func TestNonInternetClassRefused(t *testing.T) {
+	fxt := setup(t)
+
+	query := new(dns.Msg)
+	query.SetQuestion(singleAName, dns.TypeA)
+	query.Question[0].Qclass = dns.ClassCHAOS
 	reply, _, err := new(dns.Client).Exchange(query, fxt.dnsAddress)
 	if err != nil {
 		t.Fatalf("exchange: %v", err)
