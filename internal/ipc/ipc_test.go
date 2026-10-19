@@ -2,7 +2,6 @@ package ipc
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 
@@ -10,20 +9,13 @@ import (
 	"github.com/wrr/drop/internal/jailfs"
 )
 
-func TestParentChildCommunication(t *testing.T) {
-	ftmp, err := os.CreateTemp("", "drop-ipc-test")
+func TestSandboxArgsSending(t *testing.T) {
+	sender, receiver, err := NewArgsSocket()
 	if err != nil {
-		t.Fatalf("CreateTemp: %v", err)
-	}
-	defer os.Remove(ftmp.Name())
-	defer ftmp.Close()
-
-	parentEnd, childEnd, err := NewParentChildSocket()
-	if err != nil {
-		t.Fatalf("NewParentChildSocket: %v", err)
+		t.Fatalf("NewArgsSocket: %v", err)
 	}
 
-	sentArgs := ChildArgs{
+	sentArgs := SandboxArgs{
 		EnvId: "test-env",
 		Paths: &jailfs.Paths{
 			Cwd:       "/home/alice/project",
@@ -63,26 +55,26 @@ func TestParentChildCommunication(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		defer childEnd.Close()
-		receivedArgs, err := childEnd.RecvChildArgs()
+		defer receiver.Close()
+		receivedArgs, err := receiver.Recv()
 		if err != nil {
 			done <- err
 			return
 		}
 		if !reflect.DeepEqual(receivedArgs, &sentArgs) {
-			done <- fmt.Errorf("received args differ from sent args:\ngot:  %+v\nwant: %+v", receivedArgs, &sentArgs)
+			done <- fmt.Errorf("received args:\ngot:  %+v\nwant: %+v", receivedArgs, &sentArgs)
 			return
 		}
 
 		done <- nil
 	}()
 
-	if err := parentEnd.SendChildArgs(sentArgs); err != nil {
-		t.Fatalf("SendChildArgs: %v", err)
+	if err := sender.Send(sentArgs); err != nil {
+		t.Fatalf("Send: %v", err)
 	}
 
-	if err := parentEnd.Close(); err != nil {
-		t.Fatalf("parent Close: %v", err)
+	if err := sender.Close(); err != nil {
+		t.Fatalf("sender end Close: %v", err)
 	}
 
 	if err := <-done; err != nil {

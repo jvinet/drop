@@ -29,11 +29,11 @@ const unixSocketPathLimit = 107
 // descriptor to stream input and output between the sandboxed and the
 // original terminal.
 //
-// Unlike the parent-child socket pair, this uses a named Unix domain
-// socket so it can also receive the descriptor from runsc, which
-// connects to and sends the pseudoterminal master over a named socket
-// passed via --console-socket and does not support an unnamed socket
-// pair.
+// Unlike the socket pair for sending SandboxArgs, this uses a named
+// Unix domain socket so it can also receive the descriptor from
+// runsc, which connects to and sends the pseudoterminal master over a
+// named socket passed via --console-socket and does not support an
+// unnamed socket pair.
 type PtyReceiver struct {
 	// path of the listening socket; unlinked on Close.
 	path string
@@ -53,7 +53,7 @@ type PtySender struct {
 //
 // It is OK for the sender (the child, or runsc via --console-socket)
 // to connect to the socket and send the descriptor before the parent
-// calls RecvPty.
+// calls Recv.
 func NewPtyReceiver(path string) (*PtyReceiver, error) {
 	if len(path) > unixSocketPathLimit {
 		return nil, fmt.Errorf("unix socket path longer than %d characters: %q", unixSocketPathLimit, path)
@@ -87,13 +87,13 @@ func NewPtyReceiver(path string) (*PtyReceiver, error) {
 	}, nil
 }
 
-// RecvPty waits for the child to connect to the named Unix domain
+// Recv waits for the child to connect to the named Unix domain
 // socket and to send file descriptor of the parent's end of the
 // pseudoterminal.
-func (p *PtyReceiver) RecvPty() (*os.File, error) {
+func (p *PtyReceiver) Recv() (*os.File, error) {
 	connFd, _, err := unix.Accept(int(p.socket.Fd()))
 	if err != nil {
-		return nil, recvPtyError("accept: %v", err)
+		return nil, recvError("accept: %v", err)
 	}
 	defer unix.Close(connFd)
 
@@ -101,7 +101,7 @@ func (p *PtyReceiver) RecvPty() (*os.File, error) {
 	oob := make([]byte, unix.CmsgSpace(4))
 	n, oobn, _, _, err := unix.Recvmsg(connFd, buf, oob, 0)
 	if err != nil {
-		return nil, recvPtyError("recvmsg: %v", err)
+		return nil, recvError("recvmsg: %v", err)
 	}
 	// Recvmsg has a bug and does not propagate err correctly,
 	// so we detect EOF manually.
@@ -111,17 +111,17 @@ func (p *PtyReceiver) RecvPty() (*os.File, error) {
 	}
 	scms, err := unix.ParseSocketControlMessage(oob[:oobn])
 	if err != nil {
-		return nil, recvPtyError("parse socket control message: %v", err)
+		return nil, recvError("parse socket control message: %v", err)
 	}
 	if len(scms) != 1 {
-		return nil, recvPtyError("expected 1 socket control message, got %d", len(scms))
+		return nil, recvError("expected 1 socket control message, got %d", len(scms))
 	}
 	fds, err := unix.ParseUnixRights(&scms[0])
 	if err != nil {
-		return nil, recvPtyError("parse unix rights: %v", err)
+		return nil, recvError("parse unix rights: %v", err)
 	}
 	if len(fds) != 1 {
-		return nil, recvPtyError("expected 1 fd, got %d", len(fds))
+		return nil, recvError("expected 1 fd, got %d", len(fds))
 	}
 	return os.NewFile(uintptr(fds[0]), "pty"), nil
 }
@@ -148,10 +148,10 @@ func NewPtySender(path string) (*PtySender, error) {
 	return &PtySender{socketFd: fd}, nil
 }
 
-// SendPty sends f, the descriptor of the parent's end of the
+// Send sends f, the descriptor of the parent's end of the
 // pseudoterminal. The parent uses this descriptor to stream input and
 // output between the sandboxed and the original terminal.
-func (p *PtySender) SendPty(f *os.File) error {
+func (p *PtySender) Send(f *os.File) error {
 	rights := unix.UnixRights(int(f.Fd()))
 	if err := unix.Sendmsg(p.socketFd, []byte{0}, rights, nil, 0); err != nil {
 		return fmt.Errorf("send pty file descriptor: %v", err)
@@ -164,6 +164,6 @@ func (p *PtySender) Close() {
 	unix.Close(p.socketFd)
 }
 
-func recvPtyError(format string, a ...any) error {
+func recvError(format string, a ...any) error {
 	return fmt.Errorf("recv pty: "+format, a...)
 }

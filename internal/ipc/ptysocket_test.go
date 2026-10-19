@@ -50,10 +50,10 @@ func TestSendRecvPty(t *testing.T) {
 			return
 		}
 		defer sender.Close()
-		sendErr <- sender.SendPty(src)
+		sendErr <- sender.Send(src)
 	}()
 
-	received, err := receiver.RecvPty()
+	received, err := receiver.Recv()
 	if err != nil {
 		t.Fatalf("RecvPty: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestRecvPtyEOF(t *testing.T) {
 		sender.Close()
 	}()
 
-	if _, err := receiver.RecvPty(); !errors.Is(err, io.EOF) {
+	if _, err := receiver.Recv(); !errors.Is(err, io.EOF) {
 		t.Errorf("RecvPty err = %v, want io.EOF", err)
 	}
 }

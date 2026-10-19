@@ -73,8 +73,9 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		return fmt.Errorf("port forwarding is only supported with isolated network mode (--net isolated)")
 	}
 
-	// Socket pair for communicating with the init process.
-	parentEnd, childEnd, err := ipc.NewParentChildSocket()
+	// Socket pair for sending arguments and synchronizing setup with
+	// the init process.
+	argsSender, argsReceiver, err := ipc.NewArgsSocket()
 	if err != nil {
 		return err
 	}
@@ -142,7 +143,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 	} else {
 		cmd.Stderr = struct{ io.Writer }{os.Stderr}
 	}
-	cmd.ExtraFiles = []*os.File{childEnd.Socket}
+	cmd.ExtraFiles = []*os.File{argsReceiver.Socket}
 
 	cloneFlags := uintptr(syscall.CLONE_NEWNS |
 		syscall.CLONE_NEWIPC |
@@ -236,7 +237,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 	processTerminated := osutil.CatchAndForwardSignals(cmd.Process)
 	defer processTerminated()
 
-	childEnd.Close()
+	argsReceiver.Close()
 
 	// Start pasta to provide network connectivity to the jailed process
 	// in isolated network mode
@@ -253,17 +254,19 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		defer cleanPasta()
 	}
 
-	childArgs := ipc.ChildArgs{
+	sandboxArgs := ipc.SandboxArgs{
 		EnvId:    flags.EnvId,
 		Paths:    paths,
 		Config:   cfg,
 		ExecArgs: flags.Args,
 	}
-	// This must be run after network setup has finished.
-	if err := parentEnd.SendChildArgs(childArgs); err != nil {
+	// This must be done after network setup is finished. Args sending
+	// is used to synchronize setup with the child and inform that a
+	// sandbox program can be executed.
+	if err := argsSender.Send(sandboxArgs); err != nil {
 		return err
 	}
-	parentEnd.Close()
+	argsSender.Close()
 
 	type ptyResult struct {
 		parentPty *os.File
@@ -275,7 +278,7 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 		// Run concurrently with cmd.Wait, because it can block in case
 		// the child dies before sending the pty.
 		go func() {
-			parentPty, err := ptyReceiver.RecvPty()
+			parentPty, err := ptyReceiver.Recv()
 			ptyCh <- ptyResult{parentPty, err}
 		}()
 	}
@@ -329,18 +332,20 @@ func RunParent(flags *cli.RunFlags, homeDir, dropHome string) error {
 // It sets up the namespace, drops privileges and executes a command
 // provided by the user.
 func RunInit() error {
-	// The child end of the socket pair is inherited as file descriptor 3
-	childEnd := ipc.NewChildEnd(3)
-	defer childEnd.Close()
+	// The receiver's end of the socket pair is inherited as file
+	// descriptor 3
+	argsReceiver := ipc.NewArgsReceiver(3)
+	defer argsReceiver.Close()
 
-	childArgs, err := childEnd.RecvChildArgs()
+	// Recv informs the init process that parent's setup has finished.
+	sandboxArgs, err := argsReceiver.Recv()
 	if err != nil {
 		return err
 	}
-	envId := childArgs.EnvId
-	paths := childArgs.Paths
-	cfg := childArgs.Config
-	execArgs := childArgs.ExecArgs
+	envId := sandboxArgs.EnvId
+	paths := sandboxArgs.Paths
+	cfg := sandboxArgs.Config
+	execArgs := sandboxArgs.ExecArgs
 
 	if err := ensureCapSysAdmin(); err != nil {
 		return err
@@ -382,7 +387,7 @@ func RunInit() error {
 			return err
 		}
 
-		err = ptySender.SendPty(parentPty)
+		err = ptySender.Send(parentPty)
 		ptySender.Close()
 		if err != nil {
 			return err
