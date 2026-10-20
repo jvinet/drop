@@ -20,6 +20,7 @@ import (
 	"os/signal"
 	"syscall"
 	"testing"
+	"time"
 )
 
 // TestCatchAndForwardSignals verifies that a catchable
@@ -39,7 +40,7 @@ func TestCatchAndForwardSignals(t *testing.T) {
 		cmd.Wait()
 	})
 
-	cleanup := CatchAndForwardSignals(cmd.Process)
+	cleanup := CatchAndForwardSignals(cmd.Process, time.Second)
 	defer cleanup()
 
 	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {

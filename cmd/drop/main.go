@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +27,7 @@ import (
 	"github.com/wrr/drop/internal/command"
 	"github.com/wrr/drop/internal/jailfs"
 	"github.com/wrr/drop/internal/osutil"
+	"github.com/wrr/drop/internal/proc"
 	"github.com/wrr/drop/internal/updater"
 )
 
@@ -50,32 +52,34 @@ func init() {
 }
 
 func main() {
-	var exitCode int
 	var err error
-	if len(os.Args) > 1 && os.Args[1] == "-init" {
-		exitCode, err = internalCommand(command.RunInit)
+	if len(os.Args) > 1 && os.Args[1] == proc.DropArg(proc.ProcMain) {
+		err = proc.Main()
+	} else if len(os.Args) > 1 && os.Args[1] == proc.DropArg(proc.ProcInit) {
+		err = proc.Init()
 	} else {
-		exitCode, err = userCommand()
+		err = userCommand()
 	}
+	exitCode, err := errToExit(err)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
 	os.Exit(exitCode)
 }
 
-func userCommand() (int, error) {
+func userCommand() error {
 	if os.Geteuid() == 0 {
-		return 1, fmt.Errorf("drop should not be run as root")
+		return fmt.Errorf("drop should not be run as root")
 	}
 
 	homeDir, err := osutil.CurrentUserHomeDir()
 	if err != nil {
-		return 1, err
+		return err
 	}
 
 	dropHome, err := jailfs.DropHome(homeDir)
 	if err != nil {
-		return 1, err
+		return err
 	}
 
 	handlers := cli.Handlers{
@@ -86,7 +90,7 @@ func userCommand() (int, error) {
 			return nil
 		},
 		Run: func(flags *cli.RunFlags) error {
-			return command.RunParent(flags, homeDir, dropHome)
+			return command.Run(flags, homeDir, dropHome)
 		},
 		Ls: func() error {
 			envs, err := jailfs.LsEnvs(dropHome)
@@ -126,20 +130,17 @@ func userCommand() (int, error) {
 	}
 
 	cmd := cli.Command(Version, handlers)
-	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			// Propagate child's exec exit code without printing any error message.
-			return exitError.ExitCode(), nil
-		}
-		return 1, err
-	}
-	return 0, nil
+	return cmd.Run(context.Background(), os.Args)
 }
 
-func internalCommand(run func() error) (int, error) {
-	err := run()
-	if err != nil {
-		return 1, err
+func errToExit(err error) (int, error) {
+	if err == nil {
+		return 0, nil
 	}
-	return 0, nil
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		// Propagate child's exit code without printing any error message.
+		return exitError.ExitCode(), nil
+	}
+	return 1, err
 }

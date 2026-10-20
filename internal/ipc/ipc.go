@@ -40,6 +40,7 @@ type SandboxArgs struct {
 	EnvId    string
 	Paths    *jailfs.Paths
 	Config   *config.Config
+	BeRoot   bool
 	ExecArgs []string
 }
 

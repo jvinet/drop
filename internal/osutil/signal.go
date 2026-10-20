@@ -23,10 +23,10 @@ import (
 
 // CatchAndForwardSignals installs handlers for catchable shutdown
 // signals. When such signal is delivered to the parent, it is
-// forwarded to proc; if proc is still alive after 2 seconds it is
+// forwarded to proc; if proc is still alive after timeout it is
 // killed with SIGKILL. Returns a function that should be called when
 // process to which signals are forwarded terminates.
-func CatchAndForwardSignals(proc *os.Process) func() {
+func CatchAndForwardSignals(proc *os.Process, timeout time.Duration) func() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGQUIT)
 	processTerminated := make(chan struct{})
@@ -37,7 +37,7 @@ func CatchAndForwardSignals(proc *os.Process) func() {
 			_ = proc.Signal(sig)
 			select {
 			case <-processTerminated:
-			case <-time.After(1 * time.Second):
+			case <-time.After(timeout):
 				_ = proc.Kill()
 			}
 		case <-processTerminated:
