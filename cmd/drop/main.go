@@ -53,9 +53,9 @@ func main() {
 	var exitCode int
 	var err error
 	if len(os.Args) > 1 && os.Args[1] == "-init" {
-		exitCode, err = initProcessEntry()
+		exitCode, err = internalCommand(command.RunInit)
 	} else {
-		exitCode, err = parentProcessEntry()
+		exitCode, err = userCommand()
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -63,7 +63,7 @@ func main() {
 	os.Exit(exitCode)
 }
 
-func parentProcessEntry() (int, error) {
+func userCommand() (int, error) {
 	if os.Geteuid() == 0 {
 		return 1, fmt.Errorf("drop should not be run as root")
 	}
@@ -136,8 +136,8 @@ func parentProcessEntry() (int, error) {
 	return 0, nil
 }
 
-func initProcessEntry() (int, error) {
-	err := command.RunInit()
+func internalCommand(run func() error) (int, error) {
+	err := run()
 	if err != nil {
 		return 1, err
 	}
