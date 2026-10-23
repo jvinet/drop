@@ -62,21 +62,7 @@ func initEnv(envId string, noCwd bool, homeDir, dropHome string) error {
 
 	envConfigPath := jailfs.EnvConfigPath(homeDir, envId)
 	if !osutil.CanStat(envConfigPath) {
-		var mounts []config.DefaultMount
-		// Add cwd to configured mounts, but only if cwd is not the home
-		// directory or a parent of it to avoid exposing the whole home
-		// directory.
-		if !noCwd && !osutil.IsSubDirOrSame(cwd, homeDir) {
-			// If CWD is under home dir, add a config entry that uses '~' to
-			// represent home, not the absolute home dir path.
-			cwdCleaned := osutil.HomeDirToTilde(cwd, homeDir)
-			mounts = []config.DefaultMount{
-				{Entry: cwdCleaned + "::rw", Comment: "Allow read-write"},
-				{Entry: cwdCleaned + "/.git", Comment: "Allow read-only, block changing git config or adding hooks"},
-			}
-		}
-
-		if err := config.WriteDefaultForEnv(envConfigPath, mounts, homeDir); err != nil {
+		if err := config.WriteDefaultForEnv(envConfigPath, noCwd, homeDir, cwd); err != nil {
 			return err
 		}
 	}

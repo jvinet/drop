@@ -256,7 +256,12 @@ udp_host_ports = []
 
 // WriteDefaultForEnv writes a default config file for a new drop
 // environment to path.
-func WriteDefaultForEnv(path string, mounts []DefaultMount, homeDir string) error {
+//
+// The config by default shares the cwd if sharing of cwd does not
+// expose the home dir (cwd is homeDir or a parent of it). cwd sharing
+// can be disabled by setting noCwd to true.
+func WriteDefaultForEnv(path string, noCwd bool, homeDir, cwd string) error {
+	mounts := cwdMounts(noCwd, homeDir, cwd)
 	mounts = keepExistingEntries(mounts, homeDir)
 	envConfig := fmt.Sprintf(`#######################################################
 # Drop sandbox environment-specific configuration file.
@@ -296,6 +301,22 @@ udp_host_ports = []
 		return fmt.Errorf("write environment config to %v: %v", path, err)
 	}
 
+	return nil
+}
+
+func cwdMounts(noCwd bool, homeDir, cwd string) []DefaultMount {
+	// Add cwd to configured mounts, but only if cwd is not the home
+	// directory or a parent of it to avoid exposing the whole home
+	// directory.
+	if !noCwd && !osutil.IsSubDirOrSame(cwd, homeDir) {
+		// If cwd is under home dir, add a config entry that uses '~' to
+		// represent home, not the absolute home dir path.
+		cwdCleaned := osutil.HomeDirToTilde(cwd, homeDir)
+		return []DefaultMount{
+			{Entry: cwdCleaned + "::rw", Comment: "Allow read-write"},
+			{Entry: cwdCleaned + "/.git", Comment: "Allow read-only, block changing git config or adding hooks"},
+		}
+	}
 	return nil
 }
 

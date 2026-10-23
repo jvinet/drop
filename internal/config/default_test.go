@@ -83,29 +83,25 @@ func TestWriteBase(t *testing.T) {
 
 func TestWriteDefaultForEnv(t *testing.T) {
 	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home-dir")
 	basePath := filepath.Join(tempDir, "base.toml")
 	envPath := filepath.Join(tempDir, "env.toml")
 
-	projectDir := filepath.Join(tempDir, "project")
+	projectDir := filepath.Join(homeDir, "project")
 	gitDir := filepath.Join(projectDir, ".git")
 	if err := os.MkdirAll(gitDir, 0700); err != nil {
 		t.Fatalf("Failed to create test dirs: %v", err)
 	}
 
-	mounts := []DefaultMount{
-		{Entry: projectDir + "::rw"},
-		{Entry: gitDir},
-	}
-
 	// WriteDefaultForEnv generates a config that extends base.toml.
-	if err := WriteBase(basePath, tempDir); err != nil {
+	if err := WriteBase(basePath, homeDir); err != nil {
 		t.Fatalf("WriteBase failed: %v", err)
 	}
-	if err := WriteDefaultForEnv(envPath, mounts, tempDir); err != nil {
+	if err := WriteDefaultForEnv(envPath, false, homeDir, projectDir); err != nil {
 		t.Fatalf("WriteDefaultForEnv failed: %v", err)
 	}
 
-	cfg, err := Read(envPath, "/test-home-dir/")
+	cfg, err := Read(envPath, homeDir)
 	if err != nil {
 		t.Fatalf("Failed to read created env config: %v", err)
 	}
@@ -115,8 +111,8 @@ func TestWriteDefaultForEnv(t *testing.T) {
 	}
 
 	expectedMounts := []Mount{
-		{Source: projectDir, Target: projectDir, RW: true},
-		{Source: gitDir, Target: gitDir},
+		{Source: "~/project", Target: "~/project", RW: true},
+		{Source: "~/project/.git", Target: "~/project/.git"},
 	}
 	if !slices.Equal(cfg.Mounts, expectedMounts) {
 		t.Errorf("Expected mounts %+v, got %+v", expectedMounts, cfg.Mounts)
@@ -131,6 +127,52 @@ func TestWriteDefaultForEnv(t *testing.T) {
 	expectEmptyList(t, "tcp_host_ports", cfg.Net.TCPHostPorts)
 	expectEmptyList(t, "udp_published_ports", cfg.Net.UDPPublishedPorts)
 	expectEmptyList(t, "udp_host_ports", cfg.Net.UDPHostPorts)
+}
+
+func TestCwdMounts(t *testing.T) {
+	homeDir := "/home/alice"
+	tests := []struct {
+		name     string
+		noCwd    bool
+		cwd      string
+		expected []string
+	}{
+		{
+			name:     "cwd under home",
+			cwd:      "/home/alice/project",
+			expected: []string{"~/project::rw", "~/project/.git"},
+		},
+		{
+			name:     "cwd outside home",
+			cwd:      "/srv/project",
+			expected: []string{"/srv/project::rw", "/srv/project/.git"},
+		},
+		{
+			name: "cwd is home",
+			cwd:  "/home/alice",
+		},
+		{
+			name: "cwd is parent of home",
+			cwd:  "/home",
+		},
+		{
+			name:  "noCwd",
+			noCwd: true,
+			cwd:   "/home/alice/project",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var entries []string
+			for _, m := range cwdMounts(tt.noCwd, homeDir, tt.cwd) {
+				entries = append(entries, m.Entry)
+			}
+			if !slices.Equal(entries, tt.expected) {
+				t.Errorf("Expected %v, got %v", tt.expected, entries)
+			}
+		})
+	}
 }
 
 func TestFilterExistingEntries(t *testing.T) {
