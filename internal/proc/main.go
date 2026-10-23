@@ -26,7 +26,7 @@ import (
 
 	"github.com/wrr/drop/internal/config"
 	"github.com/wrr/drop/internal/ipc"
-	"github.com/wrr/drop/internal/netns"
+	"github.com/wrr/drop/internal/pasta"
 	"github.com/wrr/drop/internal/pty"
 )
 
@@ -121,7 +121,7 @@ func Main() error {
 		// and used on AppArmor-enabled Debian and openSUSE, as well as
 		// SELinux policy on Fedora, allow write access to /tmp but do not
 		// allow access to the user home.
-		cleanPasta, err := netns.StartPasta(cmd.pid(), cfg.Net, paths.RunInTmp)
+		cleanPasta, err := pasta.Start(cmd.pid(), cfg.Net, paths.RunInTmp)
 		if err != nil {
 			return err
 		}

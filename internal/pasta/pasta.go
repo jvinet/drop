@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package netns
+// Package pasta is responsible for starting and managing the pasta
+// daemon to provide connectivity within the isolated network namespace
+// of the sandbox.
+package pasta
 
 import (
 	"bytes"
@@ -84,14 +87,14 @@ func publishedPortArgs(argName string, mappings []config.PublishedPort) []string
 	return args
 }
 
-// StartPasta starts pasta to provide network connectivity
+// Start starts pasta to provide network connectivity
 // within a network namespace and configures port forwarding.
 //
 // Returns a cleanup function that should be called when program exits.
-func StartPasta(jailedPid int, netConfig config.Net, runDir string) (func(), error) {
+func Start(sandboxPid int, netConfig config.Net, runDir string) (func(), error) {
 	var pastaArgs []string
 
-	// File where pasta writes deamon child process pid after network
+	// File where pasta writes daemon child process pid after network
 	// setup is done.
 	pidPath := filepath.Join(runDir, "pasta.pid")
 	logPath := filepath.Join(runDir, "pasta.log")
@@ -128,7 +131,7 @@ func StartPasta(jailedPid int, netConfig config.Net, runDir string) (func(), err
 	pastaArgs = append(pastaArgs, publishedPortArgs("--udp-ports", netConfig.UDPPublishedPorts)...)
 	pastaArgs = append(pastaArgs, hostPortArgs("--udp-ns", netConfig.UDPHostPorts)...)
 
-	pastaArgs = append(pastaArgs, fmt.Sprintf("%d", jailedPid))
+	pastaArgs = append(pastaArgs, fmt.Sprintf("%d", sandboxPid))
 
 	pastaCmd := exec.Command("pasta", pastaArgs...)
 	pastaCmd.SysProcAttr = &syscall.SysProcAttr{
@@ -136,7 +139,7 @@ func StartPasta(jailedPid int, netConfig config.Net, runDir string) (func(), err
 		Pdeathsig: syscall.SIGKILL,
 	}
 
-	// stderr contains only short output from before Pasta demonization
+	// stderr contains only short output from before Pasta daemonization
 	// (like invalid command line arguments error).
 	var stderrBuf bytes.Buffer
 	pastaCmd.Stderr = &stderrBuf
