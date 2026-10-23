@@ -22,34 +22,13 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/wrr/drop/internal/config"
 	"github.com/wrr/drop/internal/jailfs"
 )
-
-// RunFlags contains parsed command line flags for the 'drop run'
-// command.
-type RunFlags struct {
-	EnvId       string
-	Runtime     string
-	ConfigPath  string
-	NetworkMode string
-
-	Mounts []string
-
-	BeRoot            bool
-	TcpPublishedPorts []string
-	TcpHostPorts      []string
-	UdpPublishedPorts []string
-	UdpHostPorts      []string
-
-	// Remaining command line arguments (the command to execute)
-	Args []string
-}
 
 // Command creates the urfave/cli command with all commands and flags configured.
 func Command(version, homeDir, dropHome string) *cli.Command {
 	defaultEnvId, _ := jailfs.CwdToEnvId()
-	var runFlags RunFlags
+	var flags runFlags
 	return &cli.Command{
 		Name:      "drop",
 		Usage:     "Run programs in sandboxed environments",
@@ -108,69 +87,69 @@ The -m, -t, -T, -u, -U options are appended to options from the TOML config file
 						Aliases:     []string{"e"},
 						Usage:       "Environment ID",
 						Value:       defaultEnvId,
-						Destination: &runFlags.EnvId,
+						Destination: &flags.EnvId,
 					},
 					&cli.StringFlag{
 						Name:        "config",
 						Aliases:     []string{"c"},
 						Usage:       "Path to TOML config file",
-						Destination: &runFlags.ConfigPath,
+						Destination: &flags.ConfigPath,
 					},
 					&cli.BoolFlag{
 						Name:        "root",
 						Aliases:     []string{"r"},
 						Usage:       "Be root (uid 0) in the sandbox (doesn't grant any additional privileges to the sandboxed processes).",
-						Destination: &runFlags.BeRoot,
+						Destination: &flags.BeRoot,
 					},
 					&cli.StringFlag{
 						Name:        "runtime",
 						Usage:       "Sandboxing runtime: native or gvisor",
-						Destination: &runFlags.Runtime,
+						Destination: &flags.Runtime,
 					},
 					&cli.StringSliceFlag{
 						Name:        "mount",
 						Aliases:     []string{"m"},
 						Usage:       "Add a mount (format: source[:target][:rw])",
-						Destination: &runFlags.Mounts,
+						Destination: &flags.Mounts,
 					},
 					&cli.StringFlag{
 						Name:        "net",
 						Aliases:     []string{"n"},
 						Usage:       "Network mode: off or isolated",
-						Destination: &runFlags.NetworkMode,
+						Destination: &flags.NetworkMode,
 					},
 					&cli.StringSliceFlag{
 						Name:        "tcp-publish",
 						Aliases:     []string{"t"},
 						Usage:       "Publish a TCP port from the sandbox (format: [hostIP/]hostPort[:sandboxPort])",
-						Destination: &runFlags.TcpPublishedPorts,
+						Destination: &flags.TcpPublishedPorts,
 					},
 					&cli.StringSliceFlag{
 						Name:        "tcp-host",
 						Aliases:     []string{"T"},
 						Usage:       "Make a TCP port from the host available in the sandbox (format: hostPort[:sandboxPort])",
-						Destination: &runFlags.TcpHostPorts,
+						Destination: &flags.TcpHostPorts,
 					},
 					&cli.StringSliceFlag{
 						Name:        "udp-publish",
 						Aliases:     []string{"u"},
 						Usage:       "Publish a UDP port from the sandbox (format: [hostIP/]hostPort[:sandboxPort])",
-						Destination: &runFlags.UdpPublishedPorts,
+						Destination: &flags.UdpPublishedPorts,
 					},
 					&cli.StringSliceFlag{
 						Name:        "udp-host",
 						Aliases:     []string{"U"},
 						Usage:       "Make a UDP port from the host available in the sandbox (format: hostPort[:sandboxPort])",
-						Destination: &runFlags.UdpHostPorts,
+						Destination: &flags.UdpHostPorts,
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					runFlags.Args = cmd.Args().Slice()
+					flags.Args = cmd.Args().Slice()
 
-					if err := validateEnvId(runFlags.EnvId); err != nil {
+					if err := validateEnvId(flags.EnvId); err != nil {
 						return err
 					}
-					return run(&runFlags, homeDir, dropHome)
+					return run(&flags, homeDir, dropHome)
 				},
 			},
 			{
@@ -247,61 +226,6 @@ The editor is taken from $VISUAL, or from $EDITOR if $VISUAL is not set.`,
 	}
 }
 
-// FlagsToConfig modifies cfg from a TOML file with values passed via
-// command line flags. The function validates config after the
-// modification.
-func FlagsToConfig(cfg *config.Config, flags *RunFlags) error {
-	for _, m := range flags.Mounts {
-		mount, err := config.ParseMountCompact(m)
-		if err != nil {
-			return fmt.Errorf("command line --mount flag: %v", err)
-		}
-		cfg.Mounts = append(cfg.Mounts, *mount)
-	}
-
-	if flags.NetworkMode != "" {
-		cfg.Net.Mode = flags.NetworkMode
-	}
-	if flags.Runtime != "" {
-		cfg.Runtime = flags.Runtime
-	}
-	if len(flags.TcpPublishedPorts) > 0 {
-		p, err := parsePublishPortFlags(flags.TcpPublishedPorts)
-		if err != nil {
-			return fmt.Errorf("command line --tcp-publish flag: %v", err)
-		}
-		cfg.Net.TCPPublishedPorts = append(cfg.Net.TCPPublishedPorts, p...)
-	}
-	if len(flags.TcpHostPorts) > 0 {
-		p, err := parseHostPortFlags(flags.TcpHostPorts)
-		if err != nil {
-			return fmt.Errorf("command line --tcp-host flag: %v", err)
-		}
-		cfg.Net.TCPHostPorts = append(cfg.Net.TCPHostPorts, p...)
-	}
-	if len(flags.UdpPublishedPorts) > 0 {
-		p, err := parsePublishPortFlags(flags.UdpPublishedPorts)
-		if err != nil {
-			return fmt.Errorf("command line --udp-publish flag: %v", err)
-		}
-		cfg.Net.UDPPublishedPorts = append(cfg.Net.UDPPublishedPorts, p...)
-	}
-	if len(flags.UdpHostPorts) > 0 {
-		p, err := parseHostPortFlags(flags.UdpHostPorts)
-		if err != nil {
-			return fmt.Errorf("command line --udp-host flag: %v", err)
-		}
-		cfg.Net.UDPHostPorts = append(cfg.Net.UDPHostPorts, p...)
-	}
-	// Validate config again, all errors detected should be related to
-	// entries modified by this function, because cfg read from a file
-	// and passed to this function was already validated during reading.
-	if err := config.Validate(cfg); err != nil {
-		return fmt.Errorf("command line flags: %v", err)
-	}
-	return nil
-}
-
 func validateEnvId(envId string) error {
 	if envId == "" {
 		return fmt.Errorf("could not determine environment ID from current directory")
@@ -310,30 +234,6 @@ func validateEnvId(envId string) error {
 		return fmt.Errorf("invalid environment ID: %s", envId)
 	}
 	return nil
-}
-
-func parsePublishPortFlags(flags []string) ([]config.PublishedPort, error) {
-	var result []config.PublishedPort
-	for _, spec := range flags {
-		p, err := config.ParsePublishedPort(spec)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, *p)
-	}
-	return result, nil
-}
-
-func parseHostPortFlags(flags []string) ([]config.HostPort, error) {
-	var result []config.HostPort
-	for _, spec := range flags {
-		p, err := config.ParseHostPort(spec)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, *p)
-	}
-	return result, nil
 }
 
 func intPtr(i int) *int {
