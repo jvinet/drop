@@ -14,12 +14,11 @@
 
 // 'drop run ...' command handling
 
-package command
+package cli
 
 import (
 	"fmt"
 
-	"github.com/wrr/drop/internal/cli"
 	"github.com/wrr/drop/internal/config"
 	"github.com/wrr/drop/internal/ipc"
 	"github.com/wrr/drop/internal/jailfs"
@@ -29,7 +28,7 @@ import (
 
 // Run prepares SandboxArgs using command line parameters and TOML
 // config and starts Drop main process.
-func Run(flags *cli.RunFlags, homeDir, dropHome string) error {
+func Run(flags *RunFlags, homeDir, dropHome string) error {
 	var configPath string
 	if !osutil.CanStat(jailfs.EnvPath(dropHome, flags.EnvId)) {
 		return fmt.Errorf("environment %q doesn't exist, run 'drop init %v' to create it", flags.EnvId, flags.EnvId)
@@ -45,7 +44,7 @@ func Run(flags *cli.RunFlags, homeDir, dropHome string) error {
 		return err
 	}
 
-	if err := cli.FlagsToConfig(cfg, flags); err != nil {
+	if err := FlagsToConfig(cfg, flags); err != nil {
 		return err
 	}
 

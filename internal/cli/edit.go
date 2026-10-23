@@ -14,7 +14,7 @@
 
 // 'drop edit ...' command handling
 
-package command
+package cli
 
 import (
 	"fmt"

@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/wrr/drop/internal/cli"
-	"github.com/wrr/drop/internal/command"
 	"github.com/wrr/drop/internal/jailfs"
 	"github.com/wrr/drop/internal/osutil"
 	"github.com/wrr/drop/internal/proc"
@@ -84,13 +83,13 @@ func userCommand() error {
 
 	handlers := cli.Handlers{
 		Init: func(envId string, noCwd bool) error {
-			if err := command.InitEnv(envId, noCwd, homeDir, dropHome); err != nil {
+			if err := cli.InitEnv(envId, noCwd, homeDir, dropHome); err != nil {
 				return fmt.Errorf("init environment: %v", err)
 			}
 			return nil
 		},
 		Run: func(flags *cli.RunFlags) error {
-			return command.Run(flags, homeDir, dropHome)
+			return cli.Run(flags, homeDir, dropHome)
 		},
 		Ls: func() error {
 			envs, err := jailfs.LsEnvs(dropHome)
@@ -109,7 +108,7 @@ func userCommand() error {
 			return nil
 		},
 		Edit: func(configName string) error {
-			return command.Edit(configName, homeDir)
+			return cli.Edit(configName, homeDir)
 		},
 		Update: func(checkOnly bool) error {
 			if !checkOnly {

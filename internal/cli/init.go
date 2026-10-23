@@ -14,7 +14,7 @@
 
 // 'drop init ...' command handling
 
-package command
+package cli
 
 import (
 	"fmt"
