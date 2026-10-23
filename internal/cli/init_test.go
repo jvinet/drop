@@ -15,7 +15,7 @@ func TestInitEnv(t *testing.T) {
 	t.Run("creates env dir and both config files", func(t *testing.T) {
 		homeDir, dropHome, cwd := setupTestInit(t)
 
-		if err := InitEnv("myenv", false, homeDir, dropHome); err != nil {
+		if err := initEnv("myenv", false, homeDir, dropHome); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -48,7 +48,7 @@ func TestInitEnv(t *testing.T) {
 	t.Run("noCwd omits cwd from env config", func(t *testing.T) {
 		homeDir, dropHome, cwd := setupTestInit(t)
 
-		if err := InitEnv("myenv", true, homeDir, dropHome); err != nil {
+		if err := initEnv("myenv", true, homeDir, dropHome); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -64,7 +64,7 @@ func TestInitEnv(t *testing.T) {
 		// Set homeDir to cwd, in such case cwd should not be mount to
 		// avoid exposing the whole home dir.
 		homeDir := cwd
-		if err := InitEnv("myenv", false, homeDir, dropHome); err != nil {
+		if err := initEnv("myenv", false, homeDir, dropHome); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -81,7 +81,7 @@ func TestInitEnv(t *testing.T) {
 		os.MkdirAll(filepath.Dir(baseConfigPath), 0700)
 		os.WriteFile(baseConfigPath, []byte("existing"), 0644)
 
-		if err := InitEnv("myenv", false, homeDir, dropHome); err != nil {
+		if err := initEnv("myenv", false, homeDir, dropHome); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -98,7 +98,7 @@ func TestInitEnv(t *testing.T) {
 		os.MkdirAll(filepath.Dir(envConfigPath), 0700)
 		os.WriteFile(envConfigPath, []byte("existing"), 0644)
 
-		if err := InitEnv("myenv", false, homeDir, dropHome); err != nil {
+		if err := initEnv("myenv", false, homeDir, dropHome); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -111,7 +111,7 @@ func TestInitEnv(t *testing.T) {
 	t.Run("invalid env ID returns error", func(t *testing.T) {
 		homeDir, dropHome, _ := setupTestInit(t)
 
-		err := InitEnv("-invalid", false, homeDir, dropHome)
+		err := initEnv("-invalid", false, homeDir, dropHome)
 		if err == nil || !strings.Contains(err.Error(), "invalid environment ID: -invalid") {
 			t.Fatalf("expected 'invalid environment ID' error, got: %v", err)
 		}
@@ -120,7 +120,7 @@ func TestInitEnv(t *testing.T) {
 	t.Run("base is a reserved name", func(t *testing.T) {
 		homeDir, dropHome, _ := setupTestInit(t)
 
-		err := InitEnv("base", false, homeDir, dropHome)
+		err := initEnv("base", false, homeDir, dropHome)
 		if err == nil || !strings.Contains(err.Error(), "invalid environment ID: base") {
 			t.Fatalf("expected 'invalid environment ID' error, got: %v", err)
 		}
@@ -137,7 +137,7 @@ func TestInitEnv(t *testing.T) {
 			os.Chmod(configDir, 0700)
 		})
 
-		err := InitEnv("myenv", false, filepath.Join(dropHome, "home"), dropHome)
+		err := initEnv("myenv", false, filepath.Join(dropHome, "home"), dropHome)
 		if err == nil || !strings.Contains(err.Error(), "write base config") {
 			t.Fatalf("expected error when config dir is not writable, got: %v", err)
 		}
@@ -146,10 +146,10 @@ func TestInitEnv(t *testing.T) {
 	t.Run("Existing env returns error", func(t *testing.T) {
 		homeDir, dropHome, _ := setupTestInit(t)
 
-		if err := InitEnv("myenv", false, homeDir, dropHome); err != nil {
+		if err := initEnv("myenv", false, homeDir, dropHome); err != nil {
 			t.Fatalf("first init failed: %v", err)
 		}
-		err := InitEnv("myenv", false, homeDir, dropHome)
+		err := initEnv("myenv", false, homeDir, dropHome)
 		if err == nil || !strings.Contains(err.Error(), "myenv already exists") {
 			t.Fatalf("expected 'already exists' error, got: %v", err)
 		}

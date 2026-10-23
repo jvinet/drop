@@ -14,7 +14,6 @@
 
 // Package cli is responsible for Drop command line arguments parsing
 // and processing.
-
 package cli
 
 import (
@@ -47,20 +46,10 @@ type RunFlags struct {
 	Args []string
 }
 
-// Handlers contains callback functions for each command.
-type Handlers struct {
-	Init   func(envId string, noCwd bool) error
-	Run    func(flags *RunFlags) error
-	Ls     func() error
-	Rm     func(envId string) error
-	Edit   func(configName string) error
-	Update func(checkOnly bool) error
-}
-
 // Command creates the urfave/cli command with all commands and flags configured.
-func Command(version string, handlers Handlers) *cli.Command {
+func Command(version, homeDir, dropHome string) *cli.Command {
 	defaultEnvId, _ := jailfs.CwdToEnvId()
-	var flags RunFlags
+	var runFlags RunFlags
 	return &cli.Command{
 		Name:      "drop",
 		Usage:     "Run programs in sandboxed environments",
@@ -98,7 +87,11 @@ the TOML config file of the created environment.
 					} else {
 						envId = cmd.Args().First()
 					}
-					return handlers.Init(envId, cmd.Bool("no-cwd"))
+					noCwd := cmd.Bool("no-cwd")
+					if err := initEnv(envId, noCwd, homeDir, dropHome); err != nil {
+						return fmt.Errorf("init environment: %v", err)
+					}
+					return nil
 				},
 			},
 			{
@@ -115,69 +108,69 @@ The -m, -t, -T, -u, -U options are appended to options from the TOML config file
 						Aliases:     []string{"e"},
 						Usage:       "Environment ID",
 						Value:       defaultEnvId,
-						Destination: &flags.EnvId,
+						Destination: &runFlags.EnvId,
 					},
 					&cli.StringFlag{
 						Name:        "config",
 						Aliases:     []string{"c"},
 						Usage:       "Path to TOML config file",
-						Destination: &flags.ConfigPath,
+						Destination: &runFlags.ConfigPath,
 					},
 					&cli.BoolFlag{
 						Name:        "root",
 						Aliases:     []string{"r"},
 						Usage:       "Be root (uid 0) in the sandbox (doesn't grant any additional privileges to the sandboxed processes).",
-						Destination: &flags.BeRoot,
+						Destination: &runFlags.BeRoot,
 					},
 					&cli.StringFlag{
 						Name:        "runtime",
 						Usage:       "Sandboxing runtime: native or gvisor",
-						Destination: &flags.Runtime,
+						Destination: &runFlags.Runtime,
 					},
 					&cli.StringSliceFlag{
 						Name:        "mount",
 						Aliases:     []string{"m"},
 						Usage:       "Add a mount (format: source[:target][:rw])",
-						Destination: &flags.Mounts,
+						Destination: &runFlags.Mounts,
 					},
 					&cli.StringFlag{
 						Name:        "net",
 						Aliases:     []string{"n"},
 						Usage:       "Network mode: off or isolated",
-						Destination: &flags.NetworkMode,
+						Destination: &runFlags.NetworkMode,
 					},
 					&cli.StringSliceFlag{
 						Name:        "tcp-publish",
 						Aliases:     []string{"t"},
 						Usage:       "Publish a TCP port from the sandbox (format: [hostIP/]hostPort[:sandboxPort])",
-						Destination: &flags.TcpPublishedPorts,
+						Destination: &runFlags.TcpPublishedPorts,
 					},
 					&cli.StringSliceFlag{
 						Name:        "tcp-host",
 						Aliases:     []string{"T"},
 						Usage:       "Make a TCP port from the host available in the sandbox (format: hostPort[:sandboxPort])",
-						Destination: &flags.TcpHostPorts,
+						Destination: &runFlags.TcpHostPorts,
 					},
 					&cli.StringSliceFlag{
 						Name:        "udp-publish",
 						Aliases:     []string{"u"},
 						Usage:       "Publish a UDP port from the sandbox (format: [hostIP/]hostPort[:sandboxPort])",
-						Destination: &flags.UdpPublishedPorts,
+						Destination: &runFlags.UdpPublishedPorts,
 					},
 					&cli.StringSliceFlag{
 						Name:        "udp-host",
 						Aliases:     []string{"U"},
 						Usage:       "Make a UDP port from the host available in the sandbox (format: hostPort[:sandboxPort])",
-						Destination: &flags.UdpHostPorts,
+						Destination: &runFlags.UdpHostPorts,
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					flags.Args = cmd.Args().Slice()
+					runFlags.Args = cmd.Args().Slice()
 
-					if err := validateEnvId(flags.EnvId); err != nil {
+					if err := validateEnvId(runFlags.EnvId); err != nil {
 						return err
 					}
-					return handlers.Run(&flags)
+					return run(&runFlags, homeDir, dropHome)
 				},
 			},
 			{
@@ -188,7 +181,10 @@ The -m, -t, -T, -u, -U options are appended to options from the TOML config file
 					if cmd.NArg() != 0 {
 						return cli.Exit("usage: drop ls", 1)
 					}
-					return handlers.Ls()
+					if err := ls(dropHome); err != nil {
+						return fmt.Errorf("list environments: %v", err)
+					}
+					return nil
 				},
 			},
 			{
@@ -200,7 +196,10 @@ The -m, -t, -T, -u, -U options are appended to options from the TOML config file
 						return cli.Exit("usage: drop rm <env-id>", 1)
 					}
 					envId := cmd.Args().First()
-					return handlers.Rm(envId)
+					if err := jailfs.RmEnv(homeDir, dropHome, envId); err != nil {
+						return fmt.Errorf("remove environment '%s': %v", envId, err)
+					}
+					return nil
 				},
 			},
 			{
@@ -225,7 +224,7 @@ The editor is taken from $VISUAL, or from $EDITOR if $VISUAL is not set.`,
 							return err
 						}
 					}
-					return handlers.Edit(configName)
+					return edit(configName, homeDir)
 				},
 			},
 			{
@@ -241,7 +240,7 @@ The editor is taken from $VISUAL, or from $EDITOR if $VISUAL is not set.`,
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return handlers.Update(cmd.Bool("check"))
+					return update(version, cmd.Bool("check"))
 				},
 			},
 		},

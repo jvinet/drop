@@ -25,7 +25,7 @@ import (
 	"github.com/wrr/drop/internal/osutil"
 )
 
-// InitEnv creates a new drop environment ('drop init envid' command).
+// initEnv creates a new drop environment ('drop init envid' command).
 //
 // It creates the environment directory in dropHome, and environment
 // specific config file which extends base config file in the drop
@@ -33,7 +33,7 @@ import (
 //
 // If base config file is missing (first run of 'drop init'), the
 // function creates the default base.toml.
-func InitEnv(envId string, noCwd bool, homeDir, dropHome string) error {
+func initEnv(envId string, noCwd bool, homeDir, dropHome string) error {
 	success := false
 
 	cwd, err := os.Getwd()

@@ -25,13 +25,13 @@ import (
 	"github.com/wrr/drop/internal/jailfs"
 )
 
-// Edit opens a Drop config file in the user's editor ('drop
+// edit opens a Drop config file in the user's editor ('drop
 // edit envid' command). 'base' can be passed instead of an
 // environment id to open the config file shared by all environments.
 //
 // $VISUAL takes precedence over $EDITOR. If neither is set, the
 // config path is just printed.
-func Edit(configName, homeDir string) error {
+func edit(configName, homeDir string) error {
 	var path string
 	isBase := (configName == "base")
 	if isBase {

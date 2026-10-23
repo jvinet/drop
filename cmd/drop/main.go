@@ -27,7 +27,6 @@ import (
 	"github.com/wrr/drop/internal/jailfs"
 	"github.com/wrr/drop/internal/osutil"
 	"github.com/wrr/drop/internal/proc"
-	"github.com/wrr/drop/internal/updater"
 )
 
 var Version = "" // overridden by release binaries linker
@@ -75,60 +74,11 @@ func userCommand() error {
 	if err != nil {
 		return err
 	}
-
 	dropHome, err := jailfs.DropHome(homeDir)
 	if err != nil {
 		return err
 	}
-
-	handlers := cli.Handlers{
-		Init: func(envId string, noCwd bool) error {
-			if err := cli.InitEnv(envId, noCwd, homeDir, dropHome); err != nil {
-				return fmt.Errorf("init environment: %v", err)
-			}
-			return nil
-		},
-		Run: func(flags *cli.RunFlags) error {
-			return cli.Run(flags, homeDir, dropHome)
-		},
-		Ls: func() error {
-			envs, err := jailfs.LsEnvs(dropHome)
-			if err != nil {
-				return fmt.Errorf("list environments: %v", err)
-			}
-			for _, envId := range envs {
-				fmt.Println(envId)
-			}
-			return nil
-		},
-		Rm: func(envId string) error {
-			if err := jailfs.RmEnv(homeDir, dropHome, envId); err != nil {
-				return fmt.Errorf("remove environment '%s': %v", envId, err)
-			}
-			return nil
-		},
-		Edit: func(configName string) error {
-			return cli.Edit(configName, homeDir)
-		},
-		Update: func(checkOnly bool) error {
-			if !checkOnly {
-				return fmt.Errorf("automatic updating not yet available, you can check for updates with 'drop update --check'")
-			}
-			newVersion, err := updater.CheckForUpdate(Version)
-			if err != nil {
-				return fmt.Errorf("check for updates: %v", err)
-			}
-			if newVersion != "" {
-				fmt.Printf("Drop %s is available, your installed version is %s\n", newVersion, Version)
-				fmt.Printf("Download: https://github.com/wrr/drop/releases/latest\n")
-			} else {
-				fmt.Printf("Drop is up to date (version %s)\n", Version)
-			}
-			return nil
-		},
-	}
-
-	cmd := cli.Command(Version, handlers)
+	cmd := cli.Command(Version, homeDir, dropHome)
 	return cmd.Run(context.Background(), os.Args)
 }
 
