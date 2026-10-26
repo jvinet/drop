@@ -71,6 +71,9 @@ type Paths struct {
 	// limit (although these can still be hit with custom TMPDIR or very
 	// long username).
 	RunInTmp string
+	// RunEtc holds Drop instance-specific /etc configuration files.
+	// Files placed here take priority over files placed in Paths.Etc.
+	RunEtc string
 	// PtySocket is a path to a named socket that the child uses to send
 	// pty to the parent.
 	PtySocket string
@@ -134,12 +137,13 @@ func NewPaths(hostHome string, envId string) (*Paths, func(), error) {
 		Var:       filepath.Join(env, "var"),
 		Run:       runDir,
 		RunInTmp:  runInTmp,
+		RunEtc:    filepath.Join(runDir, "etc"),
 		PtySocket: filepath.Join(runInTmp, "pty.sock"),
 		EmptyDir:  filepath.Join(internal, "emptyd"),
 		EmptyFile: filepath.Join(internal, "empty"),
 	}
 
-	toMkdir := []string{paths.FsRoot, paths.Home, paths.Etc, paths.Var}
+	toMkdir := []string{paths.FsRoot, paths.Home, paths.Etc, paths.RunEtc, paths.Var}
 	for _, dir := range toMkdir {
 		if err := osutil.MkdirAll(dir); err != nil {
 			return nil, nil, err

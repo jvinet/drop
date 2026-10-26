@@ -28,6 +28,7 @@ import (
 	"github.com/wrr/drop/internal/ipc"
 	"github.com/wrr/drop/internal/jailfs"
 	"github.com/wrr/drop/internal/osutil"
+	"github.com/wrr/drop/internal/pasta"
 	"github.com/wrr/drop/internal/pty"
 )
 
@@ -78,8 +79,13 @@ func Init() error {
 		return fmt.Errorf("setsid for init process: %v", err)
 	}
 
-	if err := jailfs.WriteEtcFiles(paths); err != nil {
-		return fmt.Errorf("write /etc files: %v", err)
+	dnsAddr := pasta.DNSForwardAddr
+	if cfg.Net.IsFirewallEnabled() {
+		dnsAddr = "127.0.0.1"
+	}
+
+	if err := jailfs.WriteResolvConf(paths.RunEtc, dnsAddr); err != nil {
+		return fmt.Errorf("write resolv.conf: %v", err)
 	}
 
 	if err := jailfs.ArrangeFilesystem(paths, cfg); err != nil {

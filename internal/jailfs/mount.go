@@ -245,8 +245,17 @@ func (rt *root) mountEtc(paths *Paths) error {
 	// the symlink, so is more elegant and also allows to easily replace more
 	// config files as needed.
 	//
+	// The overlay has three read-only layers, from highest priority to
+	// lowest:
+	//
+	// * Instance-specific /etc in the run dir (Paths.RunEtc), with files
+	//   written automatically by Drop (resolv.conf).
+	// * Environment-specific /etc (Paths.Etc), where the user can place
+	//   their own files.
+	// * The host's /etc.
+	//
 	// Readonly overlayfs does not require upperdir= and workdir= params.
-	opts := fmt.Sprintf("lowerdir=%s:/etc", paths.Etc)
+	opts := fmt.Sprintf("lowerdir=%s:%s:/etc", paths.RunEtc, paths.Etc)
 	return rt.mount("etc", "/etc", "overlay", flags, opts)
 }
 

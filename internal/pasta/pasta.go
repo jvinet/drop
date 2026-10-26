@@ -32,6 +32,9 @@ import (
 	"github.com/wrr/drop/internal/osutil"
 )
 
+// Use the same address as podman with pasta
+const DNSForwardAddr string = "169.254.1.1"
+
 // hostPortArgs and publishedPortArgs return pasta port mapping
 // arguments. If the mappings list is empty, the port mapping is
 // disabled with the "none" argument. Each mapping is translated to a
@@ -113,7 +116,7 @@ func Start(sandboxPid int, netConfig config.Net, runDir string) (func(), error) 
 		"--config-net",
 		// Address to be used in the namespace as DNS. Pasta forwards DNS
 		// requests to this address to the actual host DNS.
-		"--dns-forward", "169.254.1.1",
+		"--dns-forward", DNSForwardAddr,
 		"--pid", pidPath,
 		"--no-map-gw",
 		"--log-file", logPath,
