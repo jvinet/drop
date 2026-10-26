@@ -26,6 +26,7 @@ import (
 	"github.com/miekg/dns" // Until v2 is stable
 
 	"github.com/wrr/drop/internal/log"
+	"github.com/wrr/drop/internal/netns"
 )
 
 const upstreamTimeout = 5 * time.Second
@@ -33,6 +34,27 @@ const ttl = 5
 
 type server struct {
 	resolver *net.Resolver
+}
+
+// ListenLoopbackUDP returns a UDP socket bound to 127.0.0.1:port in
+// the network namespace of the process pid.
+//
+// The main thread of the process must be locked to the main goroutine.
+func ListenLoopbackUDP(pid int, port uint16) (net.PacketConn, error) {
+	addr := netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), port)
+	var conn *net.UDPConn
+	err := netns.Do(pid, func() error {
+		var err error
+		conn, err = net.ListenUDP("udp4", net.UDPAddrFromAddrPort(addr))
+		if err != nil {
+			return fmt.Errorf("listen on %v in network namespace: %v", addr, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
 // StartServer answers queries arriving on conn until the returned

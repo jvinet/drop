@@ -27,7 +27,6 @@ import (
 	"github.com/wrr/drop/internal/config"
 	"github.com/wrr/drop/internal/dns"
 	"github.com/wrr/drop/internal/ipc"
-	"github.com/wrr/drop/internal/netns"
 	"github.com/wrr/drop/internal/pasta"
 	"github.com/wrr/drop/internal/pty"
 )
@@ -133,7 +132,7 @@ func Main() error {
 	if cfg.Net.IsFirewallEnabled() {
 		// Bind after pasta has brought up the loopback interface in the
 		// sandbox.
-		conn, err := netns.ListenLoopbackUDP(cmd.pid(), 53)
+		conn, err := dns.ListenLoopbackUDP(cmd.pid(), 53)
 		if err != nil {
 			return err
 		}
