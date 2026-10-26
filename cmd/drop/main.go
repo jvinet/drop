@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"runtime/debug"
 	"strings"
 
@@ -32,6 +33,15 @@ import (
 var Version = "" // overridden by release binaries linker
 
 func init() {
+	// Keep the main goroutine on the main thread. This is needed for two things:
+	//
+	// * Subprocesses started by the main goroutine can use the Pdeathsig
+	// flag to ensure they are terminated when drop exits.
+	//
+	// * Goroutines that switch to the sandbox's network namespace
+	// never switch the main thread's namespace.
+	runtime.LockOSThread()
+
 	if Version == "" {
 		// Not a realease binary, but a binary installed from the git repo
 		// with `go install` or local development binary.

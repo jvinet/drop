@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"syscall"
 	"time"
 
@@ -30,8 +29,7 @@ import (
 
 // nsCmd configures and starts drop subprocesses in new namespaces.
 //
-// All methods need to be called from the same go routine that created
-// nsCmd.
+// All methods need to be called from the main goroutine.
 type nsCmd struct {
 	stdin     io.Reader
 	stdout    io.Writer
@@ -72,7 +70,14 @@ func nsCommand(procType ProcType) *nsCmd {
 // the child in case the forwarded terminating signals do not
 // terminate it within nsCmd.killAfter. Ensures the child is killed
 // when the parent dies.
+//
+// Must be called from the main goroutine locked to the main thread.
 func (c *nsCmd) start() error {
+	// Ensure Pdeathsig fires when the whole process exits
+	// (https://github.com/golang/go/issues/27505).
+	if !osutil.IsMainThread() {
+		return fmt.Errorf("%s process start: not called from the main goroutine", c.procType)
+	}
 	exePath, err := dropExePath()
 	if err != nil {
 		return err
@@ -154,11 +159,6 @@ func (c *nsCmd) start() error {
 		Pdeathsig: syscall.SIGKILL,
 	}
 
-	// Needed to ensure this goroutine is not migrated to a different
-	// thread, which is required for correct operation of Pdeathsig.
-	// https://github.com/golang/go/issues/27505
-	runtime.LockOSThread()
-
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("%s process start: %v", c.procType, err)
 	}
@@ -233,8 +233,6 @@ func (c *nsCmd) cleanup() {
 		c.processTerminated()
 		c.processTerminated = nil
 	}
-	// Fine if not locked
-	runtime.UnlockOSThread()
 }
 
 // dropExePath returns a path to the drop binary.

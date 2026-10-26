@@ -39,6 +39,11 @@ func CanStat(path string) bool {
 	return err == nil
 }
 
+// IsMainThread reports whether the caller runs on the main OS thread.
+func IsMainThread() bool {
+	return unix.Gettid() == unix.Getpid()
+}
+
 // CanRead returns true if the current user can read the file or
 // directory at path.
 func CanRead(path string) bool {
