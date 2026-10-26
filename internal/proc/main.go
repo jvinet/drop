@@ -25,7 +25,9 @@ import (
 	"golang.org/x/term"
 
 	"github.com/wrr/drop/internal/config"
+	"github.com/wrr/drop/internal/dns"
 	"github.com/wrr/drop/internal/ipc"
+	"github.com/wrr/drop/internal/netns"
 	"github.com/wrr/drop/internal/pasta"
 	"github.com/wrr/drop/internal/pty"
 )
@@ -107,15 +109,15 @@ func Main() error {
 		}
 		defer ptyReceiver.Close()
 	}
-	// Don't pass extra capabilities to pasta
-	// Firewall and DNS setup will be done before caps are dropped
-	if err := dropAllCaps(); err != nil {
-		return err
-	}
 
 	// Start pasta to provide network connectivity to the sandboxed process
 	// in isolated network mode
 	if cfg.Net.Mode == config.NetModeIsolated {
+		// Don't pass extra capabilities to pasta. This process keeps
+		// them for the DNS setup below.
+		if err := clearAmbientCaps(); err != nil {
+			return err
+		}
 		// Store Pasta pid and log files in tmp run dir, not in the main
 		// paths.Run, because the default AppArmor policy shipped with pasta
 		// and used on AppArmor-enabled Debian and openSUSE, as well as
@@ -127,6 +129,26 @@ func Main() error {
 		}
 		defer cleanPasta()
 	}
+
+	if cfg.Net.IsFirewallEnabled() {
+		// Bind after pasta has brought up the loopback interface in the
+		// sandbox.
+		conn, err := netns.ListenLoopbackUDP(cmd.pid(), 53)
+		if err != nil {
+			return err
+		}
+		shutdown, err := dns.StartServer(conn)
+		if err != nil {
+			return err
+		}
+		defer shutdown()
+	}
+
+	// Only the DNS setup above needs extra capabilities.
+	if err := dropAllCaps(); err != nil {
+		return err
+	}
+
 	// This must be done after network setup is finished. Args sending
 	// is used inform the init process that the network setup is done
 	// and a sandboxed program can be executed.

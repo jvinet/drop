@@ -114,12 +114,15 @@ func Start(sandboxPid int, netConfig config.Net, runDir string) (func(), error) 
 
 	pastaArgs = []string{
 		"--config-net",
-		// Address to be used in the namespace as DNS. Pasta forwards DNS
-		// requests to this address to the actual host DNS.
-		"--dns-forward", DNSForwardAddr,
 		"--pid", pidPath,
 		"--no-map-gw",
 		"--log-file", logPath,
+	}
+	if !netConfig.IsFirewallEnabled() {
+		// pasta forwards DNS requests sent to DNSForwardAddr to the host's
+		// DNS. With the firewall enabled, Drop runs its own filtering DNS
+		// server in the namespace instead, and the forwarding is disabled.
+		pastaArgs = append(pastaArgs, "--dns-forward", DNSForwardAddr)
 	}
 
 	// TCP ports open in the namespace that are accessible from the host.

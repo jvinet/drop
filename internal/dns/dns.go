@@ -17,6 +17,7 @@ package dns
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"strings"
@@ -69,7 +70,7 @@ func startServer(conn net.PacketConn, upstream string) (func(), error) {
 	case <-started:
 	case err := <-errs:
 		conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("start DNS server: %v", err)
 	}
 
 	return func() { srv.Shutdown() }, nil

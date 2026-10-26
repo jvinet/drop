@@ -111,6 +111,8 @@ func ensureCapSysAdmin() error {
 	return nil
 }
 
+// dropAllCaps clears the effective, permitted and inheritable
+// capabilities of all threads (which also clears the ambient set).
 func dropAllCaps() error {
 	old := cap.GetProc()
 	empty := cap.NewSet()
@@ -120,6 +122,16 @@ func dropAllCaps() error {
 	now := cap.GetProc()
 	if cf, _ := now.Cf(empty); cf != 0 {
 		return fmt.Errorf("privileges not fully dropped: have=%q, wanted=%q", now, empty)
+	}
+	return nil
+}
+
+// clearAmbientCaps clears the ambient capabilities of all threads, so
+// executed programs don't inherit any capabilities, while this process
+// keeps them.
+func clearAmbientCaps() error {
+	if err := cap.ResetAmbient(); err != nil {
+		return fmt.Errorf("clear ambient capabilities: %v", err)
 	}
 	return nil
 }
