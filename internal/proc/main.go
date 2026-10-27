@@ -132,11 +132,11 @@ func Main() error {
 	}
 
 	if cfg.Net.IsFirewallEnabled() {
-		stop, err := firewall.Start(cmd.pid())
+		fw, err := firewall.New(cmd.pid(), &net.Resolver{PreferGo: true})
 		if err != nil {
 			return err
 		}
-		defer stop()
+		defer fw.Stop()
 
 		// Bind after pasta has brought up the loopback interface in the
 		// sandbox.
@@ -144,7 +144,7 @@ func Main() error {
 		if err != nil {
 			return err
 		}
-		shutdown, err := dns.StartServer(conn, &net.Resolver{PreferGo: true})
+		shutdown, err := dns.StartServer(conn, fw)
 		if err != nil {
 			return err
 		}

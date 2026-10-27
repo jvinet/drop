@@ -27,20 +27,27 @@ import (
 	"github.com/google/nftables/expr"
 	"golang.org/x/sys/unix"
 
+	"github.com/wrr/drop/internal/dns"
 	"github.com/wrr/drop/internal/log"
 	"github.com/wrr/drop/internal/netns"
 )
 
 const queueNum = 0
 
-// Start starts the firewall. Installs nftables rules in the network
+type Firewall struct {
+	resolver dns.Resolver
+	nft      *nftables.Conn
+	stop     func()
+}
+
+// New creates and starts the firewall. Installs nftables rules in the network
 // namespace of the process pid, which send the first packet of each
 // new connection to a queue. The queue logs and allows each
 // connection attempt.
 //
-// Returns a function that stops handling the queue, after which the
-// new connections fail.
-func Start(pid int) (func(), error) {
+// The caller should call the Firewall.Stop() function on program
+// termination.
+func New(pid int, resolver dns.Resolver) (*Firewall, error) {
 	nft, queue, err := openNetfilter(pid)
 	if err != nil {
 		return nil, err
@@ -50,9 +57,9 @@ func Start(pid int) (func(), error) {
 	stop := func() {
 		cancel()
 		queue.Close()
+		nft.CloseLasting()
 	}
 	defer func() {
-		nft.CloseLasting()
 		if !success {
 			stop()
 		}
@@ -66,7 +73,19 @@ func Start(pid int) (func(), error) {
 		return nil, err
 	}
 	success = true
-	return stop, nil
+	return &Firewall{resolver: resolver, nft: nft, stop: stop}, nil
+}
+
+// Stop closes Firewall sockets. After stopping the Firewall existing
+// rules continue to apply, no new connections are allowed.
+func (f *Firewall) Stop() {
+	f.stop()
+}
+
+// LookupNetIP resolves address taking into account Firewall filtering
+// rules.
+func (f *Firewall) LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error) {
+	return f.resolver.LookupNetIP(ctx, network, host)
 }
 
 // openNetfilter opens the nftables and nfqueue connections within the
