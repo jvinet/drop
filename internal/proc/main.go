@@ -26,6 +26,7 @@ import (
 
 	"github.com/wrr/drop/internal/config"
 	"github.com/wrr/drop/internal/dns"
+	"github.com/wrr/drop/internal/firewall"
 	"github.com/wrr/drop/internal/ipc"
 	"github.com/wrr/drop/internal/pasta"
 	"github.com/wrr/drop/internal/pty"
@@ -130,6 +131,12 @@ func Main() error {
 	}
 
 	if cfg.Net.IsFirewallEnabled() {
+		stop, err := firewall.Start(cmd.pid())
+		if err != nil {
+			return err
+		}
+		defer stop()
+
 		// Bind after pasta has brought up the loopback interface in the
 		// sandbox.
 		conn, err := dns.ListenLoopbackUDP(cmd.pid(), 53)
@@ -143,7 +150,7 @@ func Main() error {
 		defer shutdown()
 	}
 
-	// Only the DNS setup above needs extra capabilities.
+	// Only the firewall and DNS setup above need extra capabilities.
 	if err := dropAllCaps(); err != nil {
 		return err
 	}
