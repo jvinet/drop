@@ -32,8 +32,16 @@ import (
 const upstreamTimeout = 5 * time.Second
 const ttl = 5
 
+// Resolver resolves names for the server.
+//
+// nxdomain must be reported with a *net.DNSError with IsNotFound set,
+// other errors are answered with SERVFAIL.
+type Resolver interface {
+	LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
+}
+
 type server struct {
-	resolver *net.Resolver
+	resolver Resolver
 }
 
 // ListenLoopbackUDP returns a UDP socket bound to 127.0.0.1:port in
@@ -58,26 +66,11 @@ func ListenLoopbackUDP(pid int, port uint16) (net.PacketConn, error) {
 }
 
 // StartServer answers queries arriving on conn until the returned
-// shutdown function is called. Names are resolved with the name
-// servers configured on the host.
+// shutdown function is called. Names are resolved with resolver.
 //
 // Takes ownership of conn, closing it when the server fails to start
 // or the shutdown function is called.
-func StartServer(conn net.PacketConn) (func(), error) {
-	return startServer(conn, "")
-}
-
-// startServer allows to set an upstream server where DNS lookups are
-// send instead of using the host-configured upstreams. This is needed
-// for unit tests.
-func startServer(conn net.PacketConn, upstream string) (func(), error) {
-	resolver := &net.Resolver{PreferGo: true}
-	if upstream != "" {
-		resolver.Dial = func(ctx context.Context, network, _ string) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, network, upstream)
-		}
-	}
+func StartServer(conn net.PacketConn, resolver Resolver) (func(), error) {
 	s := &server{resolver: resolver}
 	srv := &dns.Server{
 		PacketConn: conn,

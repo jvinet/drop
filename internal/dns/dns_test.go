@@ -15,6 +15,7 @@
 package dns
 
 import (
+	"context"
 	"net"
 	"slices"
 	"sync/atomic"
@@ -181,7 +182,14 @@ func setupServer(t *testing.T, upstreamAddr string) string {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	stop, err := startServer(conn, upstreamAddr)
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, network, upstreamAddr)
+		},
+	}
+	stop, err := StartServer(conn, resolver)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -212,7 +220,7 @@ func TestStartErrorReporting(t *testing.T) {
 		t.Fatalf("close: %v", err)
 	}
 
-	stop, err := startServer(conn, "")
+	stop, err := StartServer(conn, &net.Resolver{})
 	if err == nil {
 		stop()
 		t.Fatal("start server: got no error for a closed conn")

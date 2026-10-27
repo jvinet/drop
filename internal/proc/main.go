@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"syscall"
 
@@ -143,7 +144,7 @@ func Main() error {
 		if err != nil {
 			return err
 		}
-		shutdown, err := dns.StartServer(conn)
+		shutdown, err := dns.StartServer(conn, &net.Resolver{PreferGo: true})
 		if err != nil {
 			return err
 		}
