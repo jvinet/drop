@@ -16,6 +16,9 @@ package firewall
 
 import (
 	"fmt"
+	"net/netip"
+	"strconv"
+	"strings"
 )
 
 type action int
@@ -51,4 +54,134 @@ func parseAction(s string) (action, error) {
 		return ask, nil
 	}
 	return deny, fmt.Errorf("invalid action %q, expected allow, deny or ask", s)
+}
+
+// rule defines an action to take by the firewall and the traffic
+// destination to which the action applies.
+type rule struct {
+	action action
+	// A lowercase domain name without trailing dot, empty if addr is set.
+	domain string
+	// An IP address or address range, invalid if domain is set.
+	addr netip.Prefix
+	// Empty means all the ports.
+	ports []int
+	// "tcp" or "udp", empty means both
+	proto string
+	// Where the rule comes from.
+	origin string
+}
+
+// parseRule parses a firewall rule from a string config line.
+// Example valid strings:
+//
+//	deny   example.com
+//	allow  registry.npmjs.org:80,443
+//	allow  example.com:8443/udp
+//	allow  home.example.com:8080
+//	allow  73.23.75.23:45
+//	ask    192.168.0.0/16
+//	allow  192.168.0.0/16:80/tcp
+func parseRule(line string) (rule, error) {
+	var r rule
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return rule{}, fmt.Errorf("expected action and target")
+	}
+	if len(fields) > 2 {
+		return rule{}, fmt.Errorf("unexpected %q after the target", fields[2])
+	}
+	action, err := parseAction(fields[0])
+	if err != nil {
+		return rule{}, err
+	}
+	r.action = action
+
+	target := strings.ToLower(fields[1])
+	// The protocol is after the last slash, unless that slash is the
+	// one of an IP address range (/16).
+	if i := strings.LastIndex(target, "/"); i != -1 && isLetters(target[i+1:]) {
+		proto := target[i+1:]
+		if proto != "tcp" && proto != "udp" {
+			return rule{}, fmt.Errorf("invalid protocol %q, expected tcp or udp", proto)
+		}
+		target = target[:i]
+		r.proto = proto
+	}
+	// The ports part is after the last colon which is not within
+	// bracketed IPv6 addresses.
+	if i := strings.LastIndex(target, ":"); i != -1 && !strings.HasSuffix(target, "]") {
+		for _, p := range strings.Split(target[i+1:], ",") {
+			port, err := stringToPort(p)
+			if err != nil {
+				return rule{}, err
+			}
+			r.ports = append(r.ports, port)
+		}
+		target = target[:i]
+	}
+	target, bracketed, err := removeBrackets(target)
+	if err != nil {
+		return rule{}, err
+	}
+
+	if addr, err := netip.ParseAddr(target); err == nil {
+		if addr.Zone() != "" {
+			return rule{}, fmt.Errorf("IPv6 zone in %q is not supported", target)
+		}
+		if addr.Is4In6() {
+			return rule{}, fmt.Errorf("IPv4-mapped address %q is not supported, use %s",
+				target, addr.Unmap())
+		}
+		r.addr = netip.PrefixFrom(addr, addr.BitLen())
+	} else if strings.Contains(target, "/") {
+		prefix, err := netip.ParsePrefix(target)
+		if err != nil {
+			return rule{}, fmt.Errorf("invalid address range %q", target)
+		}
+		if prefix.Addr().Is4In6() {
+			return rule{}, fmt.Errorf("IPv4-mapped address range %q is not supported", target)
+		}
+		if prefix != prefix.Masked() {
+			return rule{}, fmt.Errorf("address range %q has host bits set, expected %s",
+				target, prefix.Masked())
+		}
+		r.addr = prefix
+	} else {
+		r.domain = strings.TrimSuffix(target, ".")
+		if !isValidDomain(r.domain) {
+			return rule{}, fmt.Errorf("invalid domain %q", r.domain)
+		}
+	}
+	if bracketed && !r.addr.Addr().Is6() {
+		return rule{}, fmt.Errorf("brackets are only for IPv6 addresses: %q", target)
+	}
+	return r, nil
+}
+
+func removeBrackets(s string) (string, bool, error) {
+	hasOpening := strings.HasPrefix(s, "[")
+	hasClosing := strings.HasSuffix(s, "]")
+	if !hasOpening {
+		if hasClosing {
+			return "", false, fmt.Errorf("missing [ in %q", s)
+		}
+		return s, false, nil
+	}
+	if !hasClosing {
+		return "", false, fmt.Errorf("missing ] in %q", s)
+	}
+	return s[1 : len(s)-1], true, nil
+}
+
+func stringToPort(s string) (int, error) {
+	port, err := strconv.Atoi(s)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid port %q", s)
+	}
+	return port, nil
+}
+
+func isLetters(s string) bool {
+	return s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyz") == ""
 }
