@@ -19,7 +19,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"net"
 	"net/netip"
+	"strings"
 
 	nfqueue "github.com/florianl/go-nfqueue/v2"
 	"github.com/google/nftables"
@@ -84,8 +86,14 @@ func (f *Firewall) Stop() {
 
 // LookupNetIP resolves address taking into account Firewall filtering
 // rules.
-func (f *Firewall) LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error) {
-	return f.resolver.LookupNetIP(ctx, network, host)
+func (f *Firewall) LookupNetIP(ctx context.Context, network, domainRooted string) ([]netip.Addr, error) {
+	// Within the firewall domains are kept without the trailing dot.
+	domain := strings.TrimSuffix(domainRooted, ".")
+	if !isValidDomain(domain) {
+		return nil, &net.DNSError{Err: "invalid domain name", Name: domainRooted, IsNotFound: true}
+	}
+	// Resolver should get rooted domain, so it doesn't expand it.
+	return f.resolver.LookupNetIP(ctx, network, domainRooted)
 }
 
 // openNetfilter opens the nftables and nfqueue connections within the
